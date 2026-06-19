@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sistema-rh-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sistema_rh}
+      POSTGRES_USER: ${POSTGRES_USER:-sistema_rh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no arquivo .env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sistema_rh} -d ${POSTGRES_DB:-sistema_rh}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - sistema_rh_pgdata:/var/lib/postgresql/data
+    networks:
+      - sistema_rh_net
+
+  api:
+    build:
+      context: ./backend
+    container_name: sistema-rh-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3333
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sistema_rh}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sistema_rh}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no arquivo .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://portal88.com.br}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-3334}:3333"
+    networks:
+      - sistema_rh_net
+
+volumes:
+  sistema_rh_pgdata:
+
+networks:
+  sistema_rh_net:
+    name: sistema_rh_net

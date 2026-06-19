@@ -9,27 +9,53 @@ const prisma = new PrismaClient();
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 
 async function main() {
-  const passwordHash = await bcrypt.hash("123456", 10);
+  const passwordHash = await bcrypt.hash("Conquistas@07", 10);
 
   const rh = await prisma.user.upsert({
-    where: { email: "rh@gtf.com.br" },
-    update: {},
+    where: { email: "rh@grupogtf.com.br" },
+    update: {
+      name: "RH Grupo GTF",
+      passwordHash,
+      role: Role.RH,
+      active: true
+    },
     create: {
       name: "RH Grupo GTF",
-      email: "rh@gtf.com.br",
+      email: "rh@grupogtf.com.br",
       passwordHash,
       role: Role.RH
     }
   });
 
   const gestora = await prisma.user.upsert({
-    where: { email: "gestora@gtf.com.br" },
-    update: {},
+    where: { email: "gestora@grupogtf.com.br" },
+    update: {
+      name: "Gestora Operacional",
+      passwordHash,
+      role: Role.GESTORA,
+      active: true
+    },
     create: {
       name: "Gestora Operacional",
-      email: "gestora@gtf.com.br",
+      email: "gestora@grupogtf.com.br",
       passwordHash,
       role: Role.GESTORA
+    }
+  });
+
+  await prisma.user.upsert({
+    where: { email: "ti@grupogtf.com.br" },
+    update: {
+      name: "TI Grupo GTF",
+      passwordHash,
+      role: Role.RH,
+      active: true
+    },
+    create: {
+      name: "TI Grupo GTF",
+      email: "ti@grupogtf.com.br",
+      passwordHash,
+      role: Role.RH
     }
   });
 
@@ -128,7 +154,10 @@ async function main() {
       actorId: rh.id,
       entity: "Seed",
       action: "INITIAL_DATA",
-      metadata: { users: ["rh@gtf.com.br", "gestora@gtf.com.br"], password: "123456" }
+      metadata: {
+        users: ["rh@grupogtf.com.br", "gestora@grupogtf.com.br", "ti@grupogtf.com.br"],
+        password: "Conquistas@07"
+      }
     }
   });
 }
