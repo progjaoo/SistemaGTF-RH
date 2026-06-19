@@ -16,6 +16,107 @@ O fluxo recomendado é:
 4. Rodar `git pull`.
 5. Rebuildar a API e o frontend.
 
+## API gerenciada pelo PM2
+
+Se a API for gerenciada pelo PM2, deixe o Docker responsável apenas pelo PostgreSQL. Não mantenha a API rodando ao mesmo tempo no Docker e no PM2.
+
+No compose de VPS, o serviço `api` fica isolado no profile `docker-api`. Portanto, no fluxo com PM2, use apenas:
+
+```bash
+docker-compose -f docker-compose.vps.yml up -d postgres
+```
+
+Não use `docker-compose -f docker-compose.vps.yml up -d --build` nesse modo, porque isso é o fluxo antigo da API em Docker.
+
+### Preparar banco Docker para acesso local da API PM2
+
+O `docker-compose.vps.yml` expõe o PostgreSQL somente no localhost da VPS:
+
+```text
+127.0.0.1:5433
+```
+
+Na VPS:
+
+```bash
+cd /var/www/sistema-rh
+
+docker-compose -f docker-compose.vps.yml stop api 2>/dev/null || true
+docker rm -f sistema-rh-api 2>/dev/null || true
+
+docker-compose -f docker-compose.vps.yml up -d postgres
+```
+
+### Criar `.env` do backend para PM2
+
+Crie o arquivo:
+
+```bash
+nano /var/www/sistema-rh/backend/.env
+```
+
+Conteúdo:
+
+```env
+NODE_ENV=production
+PORT=3334
+DATABASE_URL="postgresql://sistema_rh:SUA_SENHA_DO_POSTGRES@127.0.0.1:5433/sistema_rh?schema=public"
+JWT_SECRET="SEU_JWT_SECRET"
+CORS_ORIGIN="https://portal88.com.br"
+```
+
+Use os mesmos valores de `POSTGRES_PASSWORD` e `JWT_SECRET` do `.env` da raiz da VPS.
+
+### Instalar dependências e preparar API
+
+```bash
+cd /var/www/sistema-rh/backend
+npm ci
+npx prisma generate
+npx prisma migrate deploy
+npm run build
+npm run seed
+```
+
+### Subir API no PM2
+
+```bash
+cd /var/www/sistema-rh
+
+npm install -g pm2
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 startup systemd -u root --hp /root
+```
+
+O comando `pm2 startup` vai imprimir um comando grande com `sudo env ...`. Copie e execute esse comando também.
+
+Verificar:
+
+```bash
+pm2 status
+pm2 logs sistema-rh-api
+curl http://127.0.0.1:3334/api/health
+curl https://portal88.com.br/sistema-rh-api/health
+```
+
+### Atualizar API depois de um `git pull`
+
+```bash
+cd /var/www/sistema-rh
+git pull origin main
+
+cd backend
+npm ci
+npx prisma generate
+npx prisma migrate deploy
+npm run build
+
+cd ..
+pm2 restart sistema-rh-api --update-env
+pm2 save
+```
+
 ### Primeira configuração do Git na VPS
 
 Na VPS, preserve as pastas manuais atuais e inicialize o Git em `/var/www/sistema-rh`:

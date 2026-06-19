@@ -14,10 +14,14 @@ services:
       retries: 10
     volumes:
       - sistema_rh_pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     networks:
       - sistema_rh_net
 
   api:
+    profiles:
+      - docker-api
     build:
       context: ./backend
     container_name: sistema-rh-api
