@@ -310,11 +310,19 @@ const UserInfo = styled.div<{ $collapsed: boolean }>`
   min-width: 0;
   overflow: hidden;
   opacity: ${({ $collapsed }) => ($collapsed ? 0 : 1)};
-  max-height: ${({ $collapsed }) => ($collapsed ? "0" : "56px")};
+  max-height: ${({ $collapsed }) => ($collapsed ? "0" : "64px")};
   transition: opacity 0.18s ease, max-height 0.22s ease;
 
   strong {
+    display: block;
     overflow-wrap: anywhere;
+    line-height: 1.2;
+  }
+
+  span {
+    display: block;
+    margin-top: 4px;
+    line-height: 1.2;
   }
 
   @media (max-width: 900px) {
