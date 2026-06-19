@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(uuid()) @db.Uuid
+  name           String
+  email          String          @unique
+  passwordHash   String
+  role           Role
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  mealRecords    MealRecord[]    @relation("RegisteredBy")
+  closedPeriods  BillingPeriod[] @relation("ClosedBy")
+  createdPrices  MealPrice[]     @relation("PriceCreatedBy")
+  auditLogs      AuditLog[]      @relation("AuditActor")
+}
+
+enum Role {
+  RH
+  GESTORA
+}
+
+model Employee {
+  id              String         @id @default(uuid()) @db.Uuid
+  name            String
+  status          EmployeeStatus @default(ACTIVE)
+  scheduleType    ScheduleType   @default(MON_FRI)
+  admissionDate   DateTime?      @db.Date
+  terminationDate DateTime?      @db.Date
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  mealRecords     MealRecord[]
+  priceOverrides  MealPrice[]
+
+  @@index([status])
+  @@index([name])
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ScheduleType {
+  MON_FRI
+  MON_SUN
+  CUSTOM
+}
+
+model MealPrice {
+  id          String    @id @default(uuid()) @db.Uuid
+  value       Decimal   @db.Decimal(10, 2)
+  validFrom   DateTime  @db.Date
+  validTo     DateTime? @db.Date
+  employeeId  String?   @db.Uuid
+  employee    Employee? @relation(fields: [employeeId], references: [id])
+  createdById String?   @db.Uuid
+  createdBy   User?     @relation("PriceCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([employeeId, validFrom])
+}
+
+model MealRecord {
+  id             String        @id @default(uuid()) @db.Uuid
+  employeeId     String        @db.Uuid
+  employee       Employee      @relation(fields: [employeeId], references: [id])
+  periodId       String        @db.Uuid
+  period         BillingPeriod @relation(fields: [periodId], references: [id])
+  date           DateTime      @db.Date
+  quantity       Int           @default(1)
+  registeredById String        @db.Uuid
+  registeredBy   User          @relation("RegisteredBy", fields: [registeredById], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([periodId, date])
+}
+
+model BillingPeriod {
+  id          String        @id @default(uuid()) @db.Uuid
+  label       String
+  startDate   DateTime      @db.Date
+  endDate     DateTime      @db.Date
+  status      BillingStatus @default(OPEN)
+  closedAt    DateTime?
+  closedById  String?       @db.Uuid
+  closedBy    User?         @relation("ClosedBy", fields: [closedById], references: [id])
+  totalAmount Decimal?      @db.Decimal(10, 2)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  mealRecords MealRecord[]
+
+  @@index([status])
+  @@index([startDate, endDate])
+}
+
+enum BillingStatus {
+  OPEN
+  CLOSED
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String?  @db.Uuid
+  actor     User?    @relation("AuditActor", fields: [actorId], references: [id])
+  entity    String
+  entityId  String?
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}

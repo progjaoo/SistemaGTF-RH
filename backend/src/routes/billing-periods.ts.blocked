@@ -1,0 +1,115 @@
+import ExcelJS from "exceljs";
+import { BillingStatus, Role } from "@prisma/client";
+import { Router } from "express";
+import { z } from "zod";
+import { parseDate } from "../lib/dates.js";
+import { prisma } from "../lib/prisma.js";
+import { asyncHandler } from "../middleware/async-handler.js";
+import { authenticate, requireRole, type AuthenticatedRequest } from "../middleware/auth.js";
+import { calculatePeriodSummary, serializePeriod } from "../services/calculations.js";
+
+export const billingPeriodsRouter = Router();
+
+billingPeriodsRouter.use(authenticate);
+
+const periodSchema = z.object({
+  label: z.string().min(3),
+  startDate: z.string(),
+  endDate: z.string()
+});
+
+billingPeriodsRouter.get("/", asyncHandler(async (_req, res) => {
+  const periods = await prisma.billingPeriod.findMany({
+    orderBy: [{ startDate: "desc" }]
+  });
+  res.json({ periods: periods.map(serializePeriod) });
+}));
+
+billingPeriodsRouter.post("/", requireRole(Role.RH), asyncHandler(async (req, res) => {
+  const actor = (req as AuthenticatedRequest).user;
+  const input = periodSchema.parse(req.body);
+  const startDate = parseDate(input.startDate);
+  const endDate = parseDate(input.endDate);
+
+  if (startDate > endDate) {
+    return res.status(422).json({ message: "A data inicial deve ser anterior à data final." });
+  }
+
+  const period = await prisma.billingPeriod.create({
+    data: {
+      label: input.label,
+      startDate,
+      endDate
+    }
+  });
+
+  await prisma.auditLog.create({
+    data: { actorId: actor.id, entity: "BillingPeriod", entityId: period.id, action: "CREATE_PERIOD" }
+  });
+
+  res.status(201).json({ period: serializePeriod(period) });
+}));
+
+billingPeriodsRouter.post("/:id/close", requireRole(Role.RH), asyncHandler(async (req, res) => {
+  const actor = (req as AuthenticatedRequest).user;
+  const period = await prisma.billingPeriod.findUnique({ where: { id: req.params.id } });
+  if (!period) return res.status(404).json({ message: "Período não encontrado." });
+  if (period.status === BillingStatus.CLOSED) {
+    return res.status(409).json({ message: "Período já está fechado." });
+  }
+
+  const summary = await calculatePeriodSummary(period.id);
+  const closed = await prisma.billingPeriod.update({
+    where: { id: period.id },
+    data: {
+      status: BillingStatus.CLOSED,
+      closedAt: new Date(),
+      closedById: actor.id,
+      totalAmount: summary.totalAmount
+    }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: actor.id,
+      entity: "BillingPeriod",
+      entityId: period.id,
+      action: "CLOSE_PERIOD",
+      metadata: { totalAmount: summary.totalAmount, totalQuantity: summary.totalQuantity }
+    }
+  });
+
+  res.json({ period: serializePeriod(closed), summary });
+}));
+
+billingPeriodsRouter.get("/:id/report", asyncHandler(async (req, res) => {
+  const summary = await calculatePeriodSummary(req.params.id);
+
+  if (req.query.format !== "xlsx") {
+    return res.json({ report: summary });
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Relatório");
+  sheet.columns = [
+    { header: "Funcionário", key: "employeeName", width: 30 },
+    { header: "Quantidade", key: "quantity", width: 14 },
+    { header: "Preço(s) aplicado(s)", key: "unitPrices", width: 22 },
+    { header: "Valor a descontar", key: "amount", width: 20 }
+  ];
+  sheet.getRow(1).font = { bold: true };
+  sheet.addRows(summary.employeeTotals.map((item) => ({
+    employeeName: item.employeeName,
+    quantity: item.quantity,
+    unitPrices: item.unitPrices.map((price) => `R$ ${price.toFixed(2)}`).join(", "),
+    amount: item.amount
+  })));
+  sheet.addRow({});
+  sheet.addRow({ employeeName: "Total geral", quantity: summary.totalQuantity, amount: summary.totalAmount });
+  sheet.getColumn("amount").numFmt = '"R$"#,##0.00';
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${summary.period.label}.xlsx"`);
+  return res.send(Buffer.from(buffer));
+}));
