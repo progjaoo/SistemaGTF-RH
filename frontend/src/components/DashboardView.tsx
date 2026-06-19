@@ -90,6 +90,10 @@ function deltaText(value: number | null, unit: string) {
 const SectionGrid = styled.div`
   display: grid;
   gap: 18px;
+
+  @media (max-width: 520px) {
+    gap: 12px;
+  }
 `;
 
 const KpiGrid = styled.div`
@@ -99,6 +103,10 @@ const KpiGrid = styled.div`
 
   @media (max-width: 800px) {
     grid-template-columns: 1fr;
+  }
+
+  @media (max-width: 520px) {
+    gap: 10px;
   }
 `;
 
@@ -122,6 +130,14 @@ const Kpi = styled.article`
     font-size: 2rem;
     letter-spacing: 0;
   }
+
+  @media (max-width: 520px) {
+    padding: 14px;
+
+    strong {
+      font-size: 1.65rem;
+    }
+  }
 `;
 
 const Panel = styled.section`
@@ -131,6 +147,10 @@ const Panel = styled.section`
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
+
+  @media (max-width: 520px) {
+    padding: 14px 10px;
+  }
 `;
 
 const PanelHeader = styled.div`
@@ -149,6 +169,12 @@ const PanelHeader = styled.div`
 const ChartFrame = styled.div`
   width: 100%;
   min-height: 280px;
+  min-width: 0;
+  overflow: hidden;
+
+  @media (max-width: 520px) {
+    min-height: 240px;
+  }
 `;
 
 const EmptyState = styled.div`

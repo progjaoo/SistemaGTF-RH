@@ -27,10 +27,15 @@ export const GlobalStyle = createGlobalStyle`
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
+    overflow-x: hidden;
     color: var(--ink);
     background:
       linear-gradient(90deg, rgba(15, 118, 110, 0.08) 0 1px, transparent 1px 100%) 0 0 / 42px 42px,
       var(--paper);
+  }
+
+  #root {
+    min-width: 0;
   }
 
   button,
