@@ -38,8 +38,15 @@ npm run dev
 
 ## Acessos seed
 
-- RH: `rh@gtf.com.br` / `123456`
-- Gestora: `gestora@gtf.com.br` / `123456`
+- RH: `rh@grupogtf.com.br`
+- Gestora: `gestora@grupogtf.com.br`
+- TI: `ti@grupogtf.com.br`
+
+Consulte a senha atual no seed do backend ou na documentacao operacional interna.
+
+## Deploy em VPS
+
+O guia consolidado de producao esta em [`docs/DEPLOY-VPS.md`](docs/DEPLOY-VPS.md).
 
 ## Docker
 

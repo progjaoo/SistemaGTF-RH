@@ -1,0 +1,101 @@
+# n8n + WAHA para automacao da enquete diaria de almoco.
+#
+# Passos:
+# 1. Copie .env.example para .env e preencha os valores.
+# 2. Rode: docker compose up -d
+# 3. Acesse n8n em http://localhost:${N8N_PORT:-5678}
+# 4. Acesse WAHA em http://localhost:${WAHA_PORT:-3000}/dashboard
+
+services:
+  n8n:
+    image: n8nio/n8n:${N8N_IMAGE_TAG:-latest}
+    container_name: sistema-rh-n8n
+    restart: unless-stopped
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    environment:
+      # Timezone usada pelos crons do workflow.
+      TZ: ${TZ:-America/Sao_Paulo}
+      GENERIC_TIMEZONE: ${TZ:-America/Sao_Paulo}
+
+      # URL publica do n8n se voce publicar via dominio/reverse proxy.
+      # Em ambiente local, pode deixar http://localhost:5678/.
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5678/}
+
+      # Chave fixa para criptografia de credenciais do n8n.
+      # Troque em producao e mantenha persistente.
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+
+      # Autenticacao simples do painel n8n.
+      N8N_BASIC_AUTH_ACTIVE: ${N8N_BASIC_AUTH_ACTIVE:-true}
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
+
+      # Variaveis consumidas pelo workflow importado.
+      N8N_WAHA_URL: ${N8N_WAHA_URL:-http://waha:3000}
+      N8N_WAHA_API_KEY: ${WAHA_API_KEY}
+      N8N_WAHA_SESSION: ${WAHA_SESSION_NAME:-default}
+      N8N_WA_GROUP_ID: ${WA_GROUP_ID}
+      N8N_MANAGER_CHAT_ID: ${WA_MANAGER_CHAT_ID}
+      N8N_POLL_YES_OPTION: ${POLL_YES_OPTION:-Eu peguei}
+      N8N_POLL_NO_OPTION: ${POLL_NO_OPTION:-Nao peguei}
+      N8N_CONTACT_NAME_MAP: ${CONTACT_NAME_MAP:-{}}
+      N8N_EXPECTED_PARTICIPANTS: ${EXPECTED_PARTICIPANTS:-[]}
+    volumes:
+      # Banco interno/configuracoes do n8n.
+      - n8n_data:/home/node/.n8n
+    networks:
+      - automacao_sistema_net
+    depends_on:
+      - waha
+
+  waha:
+    image: devlikeapro/waha:${WAHA_IMAGE_TAG:-latest}
+    container_name: sistema-rh-waha
+    restart: unless-stopped
+    ports:
+      - "${WAHA_PORT:-3000}:3000"
+    environment:
+      # Timezone do container.
+      TZ: ${TZ:-America/Sao_Paulo}
+
+      # Engine gratuita solicitada. A documentacao WAHA lista WEBJS, NOWEB e GOWS.
+      WHATSAPP_DEFAULT_ENGINE: ${WAHA_ENGINE:-NOWEB}
+
+      # API key exigida no header X-Api-Key. Gere um valor longo no .env real.
+      WAHA_API_KEY: ${WAHA_API_KEY}
+
+      # Credenciais do dashboard WAHA.
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:-admin}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD}
+
+      # Sessao e persistencia local para nao escanear QR code a cada restart.
+      WAHA_WORKER_ID: ${WAHA_WORKER_ID:-sistema-rh-waha}
+      WAHA_PRINT_QR: ${WAHA_PRINT_QR:-False}
+      WAHA_LOCAL_STORE_BASE_DIR: /app/.sessions
+      WHATSAPP_START_SESSION: ${WAHA_SESSION_NAME:-default}
+      WHATSAPP_RESTART_ALL_SESSIONS: ${WAHA_RESTART_ALL_SESSIONS:-True}
+
+      # Webhook global do WAHA para o n8n.
+      # O workflow importado expoe /webhook/waha-poll-vote quando ativo.
+      WHATSAPP_HOOK_URL: ${WAHA_WEBHOOK_URL:-http://n8n:5678/webhook/waha-poll-vote}
+      WHATSAPP_HOOK_EVENTS: ${WAHA_WEBHOOK_EVENTS:-poll.vote,poll.vote.failed}
+      WHATSAPP_HOOK_RETRIES_POLICY: ${WAHA_HOOK_RETRIES_POLICY:-linear}
+      WHATSAPP_HOOK_RETRIES_DELAY_SECONDS: ${WAHA_HOOK_RETRIES_DELAY_SECONDS:-2}
+      WHATSAPP_HOOK_RETRIES_ATTEMPTS: ${WAHA_HOOK_RETRIES_ATTEMPTS:-4}
+
+      # Evita URL de midia apontando para hostname interno em alguns payloads.
+      WAHA_BASE_URL: ${WAHA_PUBLIC_URL:-http://localhost:3000}
+    volumes:
+      # Sessao do WhatsApp e storage local do WAHA.
+      - waha_sessions:/app/.sessions
+    networks:
+      - automacao_sistema_net
+
+networks:
+  automacao_sistema_net:
+    name: automacao_sistema_net
+
+volumes:
+  n8n_data:
+  waha_sessions:

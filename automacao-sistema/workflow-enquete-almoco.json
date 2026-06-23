@@ -1,0 +1,346 @@
+{
+  "name": "Sistema RH - Enquete diaria de almoco via WAHA",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 11 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1001",
+      "name": "Cron - Disparar enquete 11h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -900,
+        -260
+      ],
+      "notes": "Roda de segunda a sexta as 11:00. Ajuste a expressao cron se o horario mudar."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const timezone = 'America/Sao_Paulo';\nconst yesOption = $env.N8N_POLL_YES_OPTION || 'Eu peguei';\nconst noOption = $env.N8N_POLL_NO_OPTION || 'Nao peguei';\nconst session = $env.N8N_WAHA_SESSION || 'default';\nconst chatId = $env.N8N_WA_GROUP_ID;\nif (!chatId || chatId.includes('preencher')) {\n  throw new Error('Configure N8N_WA_GROUP_ID com o ID do grupo do WhatsApp antes de ativar o workflow.');\n}\nconst parts = new Intl.DateTimeFormat('pt-BR', {\n  timeZone: timezone,\n  year: 'numeric',\n  month: '2-digit',\n  day: '2-digit'\n}).formatToParts(new Date()).reduce((acc, part) => {\n  acc[part.type] = part.value;\n  return acc;\n}, {});\nconst dateKey = `${parts.year}-${parts.month}-${parts.day}`;\nconst dateLabel = `${parts.day}/${parts.month}`;\nconst clientMessageId = `almoco_${parts.year}${parts.month}${parts.day}_${Math.random().toString(36).slice(2, 8)}`;\nconst data = $getWorkflowStaticData('global');\ndata.lunchPolls = data.lunchPolls || {};\ndata.activeLunchPollDateKey = dateKey;\ndata.lunchPolls[dateKey] = {\n  dateKey,\n  dateLabel,\n  clientMessageId,\n  pollId: null,\n  chatId,\n  session,\n  yesOption,\n  noOption,\n  status: 'prepared',\n  votes: {},\n  voteFailures: [],\n  sentAt: new Date().toISOString()\n};\nreturn [{\n  json: {\n    dateKey,\n    dateLabel,\n    clientMessageId,\n    pollRequest: {\n      session,\n      chatId,\n      id: clientMessageId,\n      poll: {\n        name: `Quem pegou almoço hoje? (${dateLabel})`,\n        options: [yesOption, noOption],\n        multipleAnswers: false\n      }\n    }\n  }\n}];"
+      },
+      "id": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1002",
+      "name": "Preparar e salvar enquete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        -260
+      ],
+      "notes": "Cria a enquete e salva um registro inicial no Workflow Static Data para correlacionar os votos depois."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.N8N_WAHA_URL || 'http://waha:3000') + '/api/sendPoll'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Api-Key",
+              "value": "={{$env.N8N_WAHA_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify($json.pollRequest)}}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1003",
+      "name": "WAHA - Enviar Poll",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -380,
+        -260
+      ],
+      "notes": "Endpoint baseado no OpenAPI publico do WAHA: POST /api/sendPoll. Validar no Swagger da versao instalada antes de producao."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const data = $getWorkflowStaticData('global');\nconst dateKey = data.activeLunchPollDateKey;\nconst poll = dateKey && data.lunchPolls ? data.lunchPolls[dateKey] : null;\nconst response = $input.first()?.json || {};\nconst pollId = response.id || response.messageId || response.message?.id || response.key?.id || response._data?.id || poll?.clientMessageId;\nif (poll) {\n  poll.pollId = pollId;\n  poll.status = 'sent';\n  poll.wahaResponse = response;\n  poll.updatedAt = new Date().toISOString();\n}\nreturn [{ json: { ok: true, dateKey, pollId, response } }];"
+      },
+      "id": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1004",
+      "name": "Registrar resposta do envio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        -260
+      ],
+      "notes": "Atualiza o registro salvo com o ID real retornado pelo WAHA quando disponivel."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "waha-poll-vote",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1005",
+      "name": "Webhook - Receber voto WAHA",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        80
+      ],
+      "webhookId": "waha-poll-vote",
+      "notes": "Configure o WAHA para enviar poll.vote e poll.vote.failed para /webhook/waha-poll-vote."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "function parseJsonEnv(name, fallback) {\n  try {\n    const raw = $env[name];\n    return raw ? JSON.parse(raw) : fallback;\n  } catch (error) {\n    return fallback;\n  }\n}\nfunction normalizeId(value) {\n  return String(value || '').replace(/@(c\\.us|s\\.whatsapp\\.net|lid)$/i, '');\n}\nconst body = $json.body || $json;\nconst event = body.event;\nconst payload = body.payload || {};\nconst vote = payload.vote || payload;\nconst pollMeta = payload.poll || {};\nconst data = $getWorkflowStaticData('global');\ndata.lunchPolls = data.lunchPolls || {};\nif (!['poll.vote', 'poll.vote.failed'].includes(event)) {\n  return [{ json: { ok: true, ignored: true, reason: `Evento ignorado: ${event || 'sem event'}` } }];\n}\nconst incomingPollId = pollMeta.id || vote.pollMessageId || vote.pollId;\nconst polls = Object.values(data.lunchPolls);\nlet poll = polls.find((item) => incomingPollId && (item.pollId === incomingPollId || incomingPollId.includes(item.clientMessageId)));\nif (!poll && data.activeLunchPollDateKey) {\n  const active = data.lunchPolls[data.activeLunchPollDateKey];\n  const sameChat = active && (vote.to === active.chatId || pollMeta.to === active.chatId);\n  if (sameChat && pollMeta.fromMe !== false) poll = active;\n}\nif (!poll) {\n  return [{ json: { ok: true, ignored: true, reason: 'Voto nao pertence a enquete ativa conhecida', incomingPollId } }];\n}\nconst voterId = vote.from || vote.participant || payload.participant || payload.from;\nif (!voterId) {\n  return [{ json: { ok: false, ignored: true, reason: 'Evento poll.vote sem identificacao do votante', payload } }];\n}\nconst timestamp = Number(vote.timestamp || body.timestamp || Math.floor(Date.now() / 1000));\nconst contactMap = parseJsonEnv('N8N_CONTACT_NAME_MAP', {});\nconst phone = normalizeId(voterId);\nconst name = contactMap[voterId] || contactMap[phone] || vote.name || vote.pushName || vote.notifyName || payload.contact?.name || phone || voterId;\nconst selectedOptions = Array.isArray(vote.selectedOptions) ? vote.selectedOptions : [];\npoll.votes = poll.votes || {};\npoll.voteFailures = poll.voteFailures || [];\nif (event === 'poll.vote.failed') {\n  poll.voteFailures.push({ voterId, name, timestamp, raw: body });\n  poll.updatedAt = new Date().toISOString();\n  return [{ json: { ok: true, failedVoteStored: true, voterId, name, dateKey: poll.dateKey } }];\n}\nconst previous = poll.votes[voterId];\nif (!previous || timestamp >= Number(previous.timestamp || 0)) {\n  poll.votes[voterId] = { voterId, name, selectedOptions, timestamp, raw: body };\n}\npoll.updatedAt = new Date().toISOString();\nreturn [{ json: { ok: true, stored: true, dateKey: poll.dateKey, voterId, name, selectedOptions } }];"
+      },
+      "id": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1006",
+      "name": "Salvar voto em static data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        80
+      ],
+      "notes": "Armazena sempre o voto mais recente de cada pessoa. WAHA pode enviar varios eventos se a pessoa mudar a opcao."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {}
+      },
+      "id": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1007",
+      "name": "Responder webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -380,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1008",
+      "name": "Cron - Apurar 18h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -900,
+        420
+      ],
+      "notes": "Roda de segunda a sexta as 18:00 para enviar a apuracao para a gestora."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "function parseJsonEnv(name, fallback) {\n  try {\n    const raw = $env[name];\n    return raw ? JSON.parse(raw) : fallback;\n  } catch (error) {\n    return fallback;\n  }\n}\nfunction dayParts() {\n  return new Intl.DateTimeFormat('pt-BR', {\n    timeZone: 'America/Sao_Paulo',\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit'\n  }).formatToParts(new Date()).reduce((acc, part) => {\n    acc[part.type] = part.value;\n    return acc;\n  }, {});\n}\nfunction normalizeId(value) {\n  return String(value || '').replace(/@(c\\.us|s\\.whatsapp\\.net|lid)$/i, '');\n}\nconst data = $getWorkflowStaticData('global');\nconst parts = dayParts();\nconst todayKey = `${parts.year}-${parts.month}-${parts.day}`;\nconst fallbackKey = data.activeLunchPollDateKey;\nconst poll = data.lunchPolls?.[todayKey] || data.lunchPolls?.[fallbackKey];\nconst session = $env.N8N_WAHA_SESSION || 'default';\nconst managerChatId = $env.N8N_MANAGER_CHAT_ID;\nif (!managerChatId || managerChatId.includes('preencher')) {\n  throw new Error('Configure N8N_MANAGER_CHAT_ID com o WhatsApp da gestora antes de ativar o workflow.');\n}\nif (!poll) {\n  const text = `🍽️ *Almoço de hoje (${parts.day}/${parts.month})*\\n\\nNao encontrei enquete ativa salva para hoje. Verifique se o fluxo das 11h rodou e se o WAHA estava conectado.`;\n  return [{ json: { messageRequest: { session, chatId: managerChatId, text }, summary: { foundPoll: false } } }];\n}\nconst yesOption = poll.yesOption || $env.N8N_POLL_YES_OPTION || 'Eu peguei';\nconst votes = Object.values(poll.votes || {});\nconst confirmed = votes\n  .filter((vote) => Array.isArray(vote.selectedOptions) && vote.selectedOptions.includes(yesOption))\n  .sort((a, b) => String(a.name || a.voterId).localeCompare(String(b.name || b.voterId), 'pt-BR'));\nconst contactMap = parseJsonEnv('N8N_CONTACT_NAME_MAP', {});\nconst expectedRaw = parseJsonEnv('N8N_EXPECTED_PARTICIPANTS', []);\nconst expected = Array.isArray(expectedRaw) ? expectedRaw.map((entry) => {\n  if (typeof entry === 'string') return { id: entry, name: contactMap[entry] || contactMap[normalizeId(entry)] || normalizeId(entry) };\n  return { id: entry.id, name: entry.name || contactMap[entry.id] || contactMap[normalizeId(entry.id)] || normalizeId(entry.id) };\n}).filter((entry) => entry.id) : [];\nconst respondedIds = new Set(votes.map((vote) => vote.voterId));\nconst missing = expected.filter((entry) => !respondedIds.has(entry.id));\nconst failed = poll.voteFailures || [];\nconst header = `🍽️ *Almoço de hoje (${poll.dateLabel || `${parts.day}/${parts.month}`})*`;\nconst confirmedText = confirmed.length\n  ? confirmed.map((vote) => `• ${vote.name || normalizeId(vote.voterId)}`).join('\\n')\n  : 'Nenhuma pessoa confirmou almoço na enquete.';\nconst missingText = missing.length\n  ? `\\n\\nSem resposta na lista esperada (${missing.length}):\\n${missing.map((entry) => `• ${entry.name}`).join('\\n')}\\n\\nFavor confirmar manualmente com essas pessoas antes do lançamento.`\n  : '\\n\\nLista de participantes esperados nao configurada; confira manualmente se alguem esqueceu de responder.';\nconst failedText = failed.length\n  ? `\\n\\nAtenção: ${failed.length} voto(s) chegaram como poll.vote.failed no WAHA. Confira manualmente no grupo.`\n  : '';\nconst text = `${header}\\n\\nConfirmaram almoço (${confirmed.length}):\\n${confirmedText}${missingText}${failedText}`;\nreturn [{\n  json: {\n    messageRequest: { session, chatId: managerChatId, text },\n    summary: {\n      dateKey: poll.dateKey,\n      pollId: poll.pollId,\n      confirmedCount: confirmed.length,\n      missingCount: missing.length,\n      failedCount: failed.length\n    }\n  }\n}];"
+      },
+      "id": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1009",
+      "name": "Montar relatorio gestora",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        420
+      ],
+      "notes": "Monta a mensagem final a partir dos votos capturados por webhook. Se EXPECTED_PARTICIPANTS estiver configurado, tambem aponta quem nao respondeu."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.N8N_WAHA_URL || 'http://waha:3000') + '/api/sendText'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Api-Key",
+              "value": "={{$env.N8N_WAHA_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify($json.messageRequest)}}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1010",
+      "name": "WAHA - Enviar relatorio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -380,
+        420
+      ],
+      "notes": "Envia a apuracao em mensagem direta para a gestora via POST /api/sendText."
+    },
+    {
+      "parameters": {},
+      "id": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1011",
+      "name": "Erro do workflow",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -900,
+        720
+      ],
+      "notes": "Captura falhas visiveis do workflow, por exemplo WAHA desconectado ou HTTP 500."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const error = $json;\nconsole.error('Erro no workflow de enquete de almoco:', JSON.stringify(error, null, 2));\nreturn [{ json: { logged: true, error } }];"
+      },
+      "id": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1012",
+      "name": "Registrar erro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        720
+      ],
+      "notes": "Deixa o erro registrado no log da execucao do n8n. Se desejar, conecte aqui outro canal de alerta."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cron - Disparar enquete 11h": {
+      "main": [
+        [
+          {
+            "node": "Preparar e salvar enquete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar e salvar enquete": {
+      "main": [
+        [
+          {
+            "node": "WAHA - Enviar Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WAHA - Enviar Poll": {
+      "main": [
+        [
+          {
+            "node": "Registrar resposta do envio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Receber voto WAHA": {
+      "main": [
+        [
+          {
+            "node": "Salvar voto em static data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar voto em static data": {
+      "main": [
+        [
+          {
+            "node": "Responder webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron - Apurar 18h": {
+      "main": [
+        [
+          {
+            "node": "Montar relatorio gestora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar relatorio gestora": {
+      "main": [
+        [
+          {
+            "node": "WAHA - Enviar relatorio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Erro do workflow": {
+      "main": [
+        [
+          {
+            "node": "Registrar erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "versionId": "b9b3aeb8-3a4a-4dbf-9ab3-4a6f3b0b1aaa",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "description": "Enquete diaria de almoco via WhatsApp/WAHA com apuracao para gestora."
+  },
+  "id": "sistema-rh-enquete-almoco-waha",
+  "tags": []
+}
