@@ -1,12 +1,12 @@
 import { Role } from "@prisma/client";
-import { Router } from "express";
+import express from "express";
 import { z } from "zod";
 import { parseDate } from "../lib/dates.js";
 import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { authenticate, requireRole, type AuthenticatedRequest } from "../middleware/auth.js";
 
-export const mealPricesRouter = Router();
+export const mealPricesRouter = express.Router();
 
 mealPricesRouter.use(authenticate);
 

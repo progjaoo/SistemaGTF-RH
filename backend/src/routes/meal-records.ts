@@ -1,14 +1,25 @@
-import { BillingStatus } from "@prisma/client";
-import { Router } from "express";
+import { BillingStatus, Prisma } from "@prisma/client";
+import express from "express";
 import { z } from "zod";
 import { formatDate, isBetween, isExpectedWorkday, parseDate } from "../lib/dates.js";
 import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { authenticate, type AuthenticatedRequest } from "../middleware/auth.js";
+import { assertNoFutureDates } from "../services/date-rules.js";
 
-export const mealRecordsRouter = Router();
+export const mealRecordsRouter = express.Router();
 
 mealRecordsRouter.use(authenticate);
+
+type ConfirmationRow = {
+  employeeId: string;
+  employeeName: string;
+  date: Date;
+  quantity: number;
+  confirmationStatus: "PENDING" | "PEGUEI" | "NAO_PEGUEI";
+  confirmationSource: "SISTEMA" | "WHATSAPP" | null;
+  confirmedAt: Date | null;
+};
 
 const bulkSchema = z.object({
   periodId: z.string(),
@@ -25,12 +36,18 @@ const serializeRecord = (record: {
   periodId: string;
   date: Date;
   quantity: number;
+  confirmationStatus?: "PENDING" | "PEGUEI" | "NAO_PEGUEI";
+  confirmationSource?: "SISTEMA" | "WHATSAPP" | null;
+  confirmedAt?: Date | null;
   registeredById: string;
   createdAt: Date;
   updatedAt: Date;
 }) => ({
   ...record,
-  date: formatDate(record.date)
+  date: formatDate(record.date),
+  confirmationStatus: record.confirmationStatus ?? "PENDING",
+  confirmationSource: record.confirmationSource ?? null,
+  confirmedAt: record.confirmedAt?.toISOString() ?? null
 });
 
 mealRecordsRouter.get("/", asyncHandler(async (req, res) => {
@@ -46,6 +63,55 @@ mealRecordsRouter.get("/", asyncHandler(async (req, res) => {
   res.json({ records: records.map((record) => ({ ...serializeRecord(record), employee: record.employee })) });
 }));
 
+mealRecordsRouter.get("/confirmations", asyncHandler(async (req, res) => {
+  const periodId = String(req.query.periodId ?? "");
+  const dateQuery = req.query.date ? String(req.query.date) : "";
+
+  if (!periodId) return res.status(400).json({ message: "Informe periodId." });
+
+  const period = await prisma.billingPeriod.findUnique({ where: { id: periodId } });
+  if (!period) return res.status(404).json({ message: "Período não encontrado." });
+
+  const date = dateQuery ? parseDate(dateQuery) : null;
+  if (date && !isBetween(date, period.startDate, period.endDate)) {
+    return res.status(422).json({ message: `Data ${dateQuery} fora do período selecionado.` });
+  }
+
+  const dateFilter = dateQuery ? Prisma.sql`AND mr."date" = ${dateQuery}::date` : Prisma.empty;
+  const records = await prisma.$queryRaw<ConfirmationRow[]>(Prisma.sql`
+    SELECT
+      mr."employeeId" AS "employeeId",
+      e."name" AS "employeeName",
+      mr."date" AS "date",
+      mr."quantity" AS "quantity",
+      mr."confirmationStatus"::text AS "confirmationStatus",
+      mr."confirmationSource"::text AS "confirmationSource",
+      mr."confirmedAt" AS "confirmedAt"
+    FROM "MealRecord" mr
+    INNER JOIN "Employee" e ON e."id" = mr."employeeId"
+    WHERE mr."periodId" = ${periodId}::uuid
+    ${dateFilter}
+    ORDER BY mr."date" ASC, e."name" ASC
+  `);
+
+  const confirmations = records
+    .map((record) => ({
+      employeeId: record.employeeId,
+      employeeName: record.employeeName,
+      date: formatDate(record.date),
+      quantity: record.quantity,
+      confirmationStatus: record.confirmationStatus,
+      confirmationSource: record.confirmationSource,
+      confirmedAt: record.confirmedAt?.toISOString() ?? null
+    }))
+    .sort((first, second) => {
+      if (first.date !== second.date) return first.date.localeCompare(second.date);
+      return first.employeeName.localeCompare(second.employeeName, "pt-BR", { sensitivity: "base" });
+    });
+
+  res.json({ confirmations });
+}));
+
 mealRecordsRouter.post("/bulk", asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const input = bulkSchema.parse(req.body);
@@ -56,6 +122,15 @@ mealRecordsRouter.post("/bulk", asyncHandler(async (req, res) => {
     return res.status(409).json({ message: "Períodos fechados não podem ser editados." });
   }
 
+  const parsedEntries = input.entries.map((entry) => ({ ...entry, dateValue: parseDate(entry.date) }));
+  const futureDateValidation = assertNoFutureDates(parsedEntries.map((entry) => entry.dateValue));
+  if (!futureDateValidation.ok) {
+    return res.status(422).json({
+      message: "Existem lançamentos com data futura.",
+      invalidDates: futureDateValidation.invalidDates
+    });
+  }
+
   const employees = await prisma.employee.findMany({
     where: { id: { in: input.entries.map((entry) => entry.employeeId) } }
   });
@@ -64,11 +139,11 @@ mealRecordsRouter.post("/bulk", asyncHandler(async (req, res) => {
   const warnings: Array<{ employeeId: string; employeeName: string; date: string; message: string }> = [];
   const records = [];
 
-  for (const entry of input.entries) {
+  for (const entry of parsedEntries) {
     const employee = employeeMap.get(entry.employeeId);
     if (!employee) return res.status(404).json({ message: "Funcionário não encontrado." });
 
-    const date = parseDate(entry.date);
+    const date = entry.dateValue;
     if (!isBetween(date, period.startDate, period.endDate)) {
       return res.status(422).json({ message: `Data ${entry.date} fora do período selecionado.` });
     }

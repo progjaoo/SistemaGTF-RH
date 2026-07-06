@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
+import { createServer } from "node:http";
 import swaggerUi from "swagger-ui-express";
 import { ZodError } from "zod";
 import { Prisma } from "@prisma/client";
@@ -10,10 +11,12 @@ import { openApiDocument } from "./docs/openapi.js";
 import { authRouter } from "./routes/auth.js";
 import { billingPeriodsRouter } from "./routes/billing-periods.js";
 import { dashboardRouter } from "./routes/dashboard.js";
+import { employeePortalRouter } from "./routes/employee-portal.js";
 import { employeesRouter } from "./routes/employees.js";
 import { mealPricesRouter } from "./routes/meal-prices.js";
 import { mealRecordsRouter } from "./routes/meal-records.js";
 import { usersRouter } from "./routes/users.js";
+import { initRealtime } from "./realtime.js";
 
 const app = express();
 
@@ -46,6 +49,7 @@ app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument, {
   }
 }));
 
+app.use("/api/employee-portal", employeePortalRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/employees", employeesRouter);
@@ -94,6 +98,11 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
   return res.status(500).json({ message: "Erro interno no servidor." });
 });
 
-app.listen(config.port, () => {
+const httpServer = createServer(app);
+
+httpServer.listen(config.port, () => {
   console.log(`Sistema RH API listening on http://localhost:${config.port}`);
+  void initRealtime(httpServer).catch((error) => {
+    console.error("Realtime indisponível:", error);
+  });
 });

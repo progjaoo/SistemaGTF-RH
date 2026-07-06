@@ -54,6 +54,17 @@ enum ScheduleType {
   CUSTOM
 }
 
+enum ConfirmationStatus {
+  PENDING
+  PEGUEI
+  NAO_PEGUEI
+}
+
+enum ConfirmationSource {
+  SISTEMA
+  WHATSAPP
+}
+
 model MealPrice {
   id          String    @id @default(uuid()) @db.Uuid
   value       Decimal   @db.Decimal(10, 2)
@@ -69,20 +80,24 @@ model MealPrice {
 }
 
 model MealRecord {
-  id             String        @id @default(uuid()) @db.Uuid
-  employeeId     String        @db.Uuid
-  employee       Employee      @relation(fields: [employeeId], references: [id])
-  periodId       String        @db.Uuid
-  period         BillingPeriod @relation(fields: [periodId], references: [id])
-  date           DateTime      @db.Date
-  quantity       Int           @default(1)
-  registeredById String        @db.Uuid
-  registeredBy   User          @relation("RegisteredBy", fields: [registeredById], references: [id])
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                 String              @id @default(uuid()) @db.Uuid
+  employeeId         String              @db.Uuid
+  employee           Employee            @relation(fields: [employeeId], references: [id])
+  periodId           String              @db.Uuid
+  period             BillingPeriod       @relation(fields: [periodId], references: [id])
+  date               DateTime            @db.Date
+  quantity           Int                 @default(1)
+  confirmationStatus ConfirmationStatus  @default(PENDING)
+  confirmationSource ConfirmationSource?
+  confirmedAt        DateTime?
+  registeredById     String              @db.Uuid
+  registeredBy       User                @relation("RegisteredBy", fields: [registeredById], references: [id])
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@unique([employeeId, date])
   @@index([periodId, date])
+  @@index([confirmationStatus])
 }
 
 model BillingPeriod {

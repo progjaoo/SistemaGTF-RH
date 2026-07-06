@@ -18,6 +18,7 @@ export const openApiDocument = {
     { name: "Employees" },
     { name: "Meal Prices" },
     { name: "Meal Records" },
+    { name: "Employee Portal" },
     { name: "Billing Periods" },
     { name: "Dashboard" }
   ],
@@ -122,6 +123,9 @@ export const openApiDocument = {
           periodId: { type: "string", format: "uuid" },
           date: { type: "string", format: "date" },
           quantity: { type: "integer", example: 1 },
+          confirmationStatus: { type: "string", enum: ["PENDING", "PEGUEI", "NAO_PEGUEI"], default: "PENDING" },
+          confirmationSource: { type: "string", enum: ["SISTEMA", "WHATSAPP"], nullable: true },
+          confirmedAt: { type: "string", format: "date-time", nullable: true },
           registeredById: { type: "string", format: "uuid" }
         }
       },
@@ -162,6 +166,52 @@ export const openApiDocument = {
           label: { type: "string", example: "Junho 2026 - 06/06 a 05/07" },
           startDate: { type: "string", format: "date", example: "2026-06-06" },
           endDate: { type: "string", format: "date", example: "2026-07-05" }
+        }
+      },
+      MealRecordConfirmation: {
+        type: "object",
+        properties: {
+          employeeId: { type: "string", format: "uuid" },
+          employeeName: { type: "string", example: "Maria Eduarda" },
+          date: { type: "string", format: "date", example: "2026-07-03" },
+          quantity: { type: "integer", example: 1 },
+          confirmationStatus: { type: "string", enum: ["PENDING", "PEGUEI", "NAO_PEGUEI"] },
+          confirmationSource: { type: "string", enum: ["SISTEMA", "WHATSAPP"], nullable: true },
+          confirmedAt: { type: "string", format: "date-time", nullable: true }
+        }
+      },
+      EmployeePortalSearchResult: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          name: { type: "string", example: "Maria Eduarda" }
+        }
+      },
+      EmployeePortalDay: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          date: { type: "string", format: "date", example: "2026-07-03" },
+          quantity: { type: "integer", example: 1 },
+          confirmationStatus: { type: "string", enum: ["PENDING", "PEGUEI", "NAO_PEGUEI"] },
+          confirmationSource: { type: "string", enum: ["SISTEMA", "WHATSAPP"], nullable: true },
+          confirmedAt: { type: "string", format: "date-time", nullable: true },
+          period: {
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              label: { type: "string" },
+              status: { type: "string", enum: ["OPEN", "CLOSED"] }
+            }
+          }
+        }
+      },
+      EmployeePortalCheckinInput: {
+        type: "object",
+        required: ["date", "status"],
+        properties: {
+          date: { type: "string", format: "date", example: "2026-07-03" },
+          status: { type: "string", enum: ["PEGUEI", "NAO_PEGUEI"] }
         }
       }
     },
@@ -324,12 +374,137 @@ export const openApiDocument = {
       post: {
         tags: ["Meal Records"],
         summary: "Salva lançamentos em lote",
+        description: "Rejeita a requisição inteira com 422 quando houver lançamento em data futura. A referência é o relógio da VPS no fuso America/Sao_Paulo.",
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
           content: { "application/json": { schema: { $ref: "#/components/schemas/MealRecordBulkInput" } } }
         },
-        responses: { "200": { description: "Lançamentos salvos" }, "409": { description: "Período fechado" } }
+        responses: {
+          "200": { description: "Lançamentos salvos" },
+          "409": { description: "Período fechado" },
+          "422": { description: "Data futura ou data fora do período selecionado" }
+        }
+      }
+    },
+    "/meal-records/confirmations": {
+      get: {
+        tags: ["Meal Records"],
+        summary: "Lista confirmações de almoço para conferência",
+        description: "Consulta operacional para RH e Gestora verificarem quem confirmou pelo Portal do Colaborador. O campo confirmationSource já reserva WHATSAPP para integração futura.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "periodId", in: "query", required: true, schema: { type: "string", format: "uuid" } },
+          { name: "date", in: "query", required: false, schema: { type: "string", format: "date" } }
+        ],
+        responses: {
+          "200": {
+            description: "Confirmações encontradas",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    confirmations: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/MealRecordConfirmation" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": { $ref: "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/employee-portal/search": {
+      get: {
+        tags: ["Employee Portal"],
+        summary: "Busca pública de funcionários ativos por nome",
+        description: "Rota pública sem JWT. Retorna apenas id e nome para o autoatendimento do colaborador.",
+        parameters: [{ name: "name", in: "query", required: true, schema: { type: "string", minLength: 2 } }],
+        responses: {
+          "200": {
+            description: "Funcionários encontrados",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    employees: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/EmployeePortalSearchResult" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": { $ref: "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/employee-portal/{employeeId}/calendar": {
+      get: {
+        tags: ["Employee Portal"],
+        summary: "Retorna calendário público de almoços do colaborador",
+        description: "Rota pública sem JWT. Mostra apenas dias com lançamento de almoço existente.",
+        parameters: [
+          { name: "employeeId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          { name: "month", in: "query", required: false, schema: { type: "string", pattern: "^\\d{4}-\\d{2}$", example: "2026-07" } }
+        ],
+        responses: {
+          "200": {
+            description: "Calendário do colaborador",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    employee: { $ref: "#/components/schemas/EmployeePortalSearchResult" },
+                    month: { type: "string", example: "2026-07" },
+                    days: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/EmployeePortalDay" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": { description: "Funcionário não encontrado" },
+          "422": { $ref: "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/employee-portal/{employeeId}/checkin": {
+      post: {
+        tags: ["Employee Portal"],
+        summary: "Confirma se o colaborador pegou almoço",
+        description: "Rota pública sem JWT. Bloqueia data futura e período fechado. A referência de hoje é o relógio da VPS no fuso America/Sao_Paulo.",
+        parameters: [{ name: "employeeId", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/EmployeePortalCheckinInput" } } }
+        },
+        responses: {
+          "200": {
+            description: "Confirmação salva",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    record: { $ref: "#/components/schemas/EmployeePortalDay" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { description: "Funcionário ou lançamento não encontrado" },
+          "422": { description: "Data futura, período fechado ou payload inválido" }
+        }
       }
     },
     "/billing-periods": {

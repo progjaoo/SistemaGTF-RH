@@ -3,14 +3,31 @@ import type {
   BillingPeriod,
   DashboardSummary,
   Employee,
+  EmployeePortalDay,
+  EmployeePortalSearchResult,
   MealPrice,
   MealRecord,
+  MealRecordConfirmation,
+  ConfirmationStatus,
   Role,
   Session,
   User
 } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3333/api";
+export const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3333/api";
+
+export function getSocketConfig() {
+  const url = new URL(API_BASE, window.location.origin);
+  const path = `${url.pathname.replace(/\/$/, "")}/socket.io`;
+  url.pathname = "";
+  url.search = "";
+  url.hash = "";
+
+  return {
+    url: url.toString().replace(/\/$/, ""),
+    path
+  };
+}
 
 async function request<T>(path: string, token?: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
@@ -76,6 +93,25 @@ export const api = {
     return request<{ records: MealRecord[]; warnings: ApiWarning[] }>("/meal-records/bulk", token, {
       method: "POST",
       body: JSON.stringify({ periodId, entries })
+    });
+  },
+  mealRecordConfirmations(token: string, periodId: string, date?: string) {
+    const params = new URLSearchParams({ periodId });
+    if (date) params.set("date", date);
+    return request<{ confirmations: MealRecordConfirmation[] }>(`/meal-records/confirmations?${params.toString()}`, token);
+  },
+  employeePortalSearch(name: string) {
+    return request<{ employees: EmployeePortalSearchResult[] }>(`/employee-portal/search?name=${encodeURIComponent(name)}`);
+  },
+  employeePortalCalendar(employeeId: string, month: string) {
+    return request<{ employee: EmployeePortalSearchResult; month: string; days: EmployeePortalDay[] }>(
+      `/employee-portal/${employeeId}/calendar?month=${encodeURIComponent(month)}`
+    );
+  },
+  employeePortalCheckin(employeeId: string, date: string, status: Exclude<ConfirmationStatus, "PENDING">) {
+    return request<{ record: EmployeePortalDay }>(`/employee-portal/${employeeId}/checkin`, undefined, {
+      method: "POST",
+      body: JSON.stringify({ date, status })
     });
   },
   dashboard(token: string, periodId: string) {

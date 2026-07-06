@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { Router } from "express";
+import express from "express";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { config } from "../config.js";
@@ -7,7 +7,7 @@ import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { authenticate, type AuthenticatedRequest } from "../middleware/auth.js";
 
-export const authRouter = Router();
+export const authRouter = express.Router();
 
 const loginSchema = z.object({
   email: z.string().email(),

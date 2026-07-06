@@ -5,6 +5,10 @@ export default defineConfig({
   plugins: [react()],
   base: process.env.VITE_BASE_PATH ?? "/",
   server: {
-    port: 5173
+    port: 5173,
+    watch: {
+      usePolling: false,
+      ignored: ["**/node_modules/**", "**/dist/**", "**/.git/**"]
+    }
   }
 });

@@ -8,12 +8,13 @@ import { useSidebarCollapsed } from "./hooks/useSidebarCollapsed";
 import type { NavigationTab, Tab } from "./navigation";
 import EmployeesPage from "./pages/EmployeesPage";
 import LoginPage from "./pages/LoginPage";
+import EmployeePortalPage from "./pages/EmployeePortalPage";
 import PeriodsPage from "./pages/PeriodsPage";
 import PricesPage from "./pages/PricesPage";
 import RecordsPage from "./pages/RecordsPage";
 import UsersPage from "./pages/UsersPage";
 import type { ApiWarning, BillingPeriod, DashboardSummary, Employee, MealPrice, User } from "./types";
-import { dateRange, fullDate } from "./utils/date";
+import { dateKeyInSaoPaulo, dateRange, fullDate } from "./utils/date";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 
@@ -53,7 +54,7 @@ export default function App() {
     setDashboard(dashboardResponse.summary);
   }, []);
 
-  const loadWorkspace = useCallback(async (currentSession: NonNullable<typeof session>) => {
+  const loadWorkspace = useCallback(async (currentSession: NonNullable<typeof session>, preferredPeriodId?: string) => {
     setLoading(true);
     setNotice("");
 
@@ -71,7 +72,9 @@ export default function App() {
       setUsers(userResponse.users);
 
       const nextPeriodId =
-        selectedPeriodId && periodResponse.periods.some((period) => period.id === selectedPeriodId)
+        preferredPeriodId && periodResponse.periods.some((period) => period.id === preferredPeriodId)
+          ? preferredPeriodId
+          : selectedPeriodId && periodResponse.periods.some((period) => period.id === selectedPeriodId)
           ? selectedPeriodId
           : periodResponse.periods.find((period) => period.status === "OPEN")?.id ?? periodResponse.periods[0]?.id ?? "";
 
@@ -98,6 +101,12 @@ export default function App() {
     setDashboard(null);
     setQuantities({});
   };
+
+  const isEmployeePortal = window.location.pathname.endsWith("/colaborador") || window.location.pathname.endsWith("/colaborador/");
+
+  if (isEmployeePortal) {
+    return <EmployeePortalPage />;
+  }
 
   if (!session) {
     return <LoginPage onLogin={handleLogin} />;
@@ -163,15 +172,17 @@ export default function App() {
           </Suspense>
         )}
         {activeTab === "records" && selectedPeriod && (
-          <RecordsPage
-            employees={employees}
-            prices={prices}
+        <RecordsPage
+          token={session.token}
+          employees={employees}
+          prices={prices}
             period={selectedPeriod}
             quantities={quantities}
             warnings={warnings}
             onChangeQuantity={(key, value) => setQuantities((current) => ({ ...current, [key]: value }))}
             onSave={async () => {
-              const dates = dateRange(selectedPeriod.startDate, selectedPeriod.endDate);
+              const today = dateKeyInSaoPaulo();
+              const dates = dateRange(selectedPeriod.startDate, selectedPeriod.endDate).filter((date) => date <= today);
               const entries = employees
                 .filter((employee) => employee.status === "ACTIVE")
                 .flatMap((employee) =>
@@ -219,8 +230,10 @@ export default function App() {
           <PeriodsPage
             periods={periods}
             onSave={async (payload) => {
-              await api.createPeriod(session.token, payload);
-              await loadWorkspace(session);
+              const response = await api.createPeriod(session.token, payload);
+              setSelectedPeriodId(response.period.id);
+              setActiveTab("records");
+              await loadWorkspace(session, response.period.id);
               setNotice("Período criado.");
             }}
             onClose={async (period) => {

@@ -22,3 +22,19 @@ export const longDate = (value: string) =>
 
 export const weekday = (value: string) =>
   new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(new Date(`${value}T00:00:00`));
+
+export function dateKeyInSaoPaulo(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+export function monthKeyInSaoPaulo(date = new Date()) {
+  return dateKeyInSaoPaulo(date).slice(0, 7);
+}

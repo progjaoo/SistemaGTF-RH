@@ -16,6 +16,14 @@ DO $$ BEGIN
   CREATE TYPE "BillingStatus" AS ENUM ('OPEN', 'CLOSED');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN
+  CREATE TYPE "ConfirmationStatus" AS ENUM ('PENDING', 'PEGUEI', 'NAO_PEGUEI');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "ConfirmationSource" AS ENUM ('SISTEMA', 'WHATSAPP');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 CREATE TABLE IF NOT EXISTS "User" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "name" text NOT NULL,
@@ -67,11 +75,19 @@ CREATE TABLE IF NOT EXISTS "MealRecord" (
   "periodId" uuid NOT NULL REFERENCES "BillingPeriod"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   "date" date NOT NULL,
   "quantity" integer NOT NULL DEFAULT 1,
+  "confirmationStatus" "ConfirmationStatus" NOT NULL DEFAULT 'PENDING',
+  "confirmationSource" "ConfirmationSource",
+  "confirmedAt" timestamp(3),
   "registeredById" uuid NOT NULL REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   "createdAt" timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "MealRecord_employeeId_date_key" UNIQUE ("employeeId", "date")
 );
+
+ALTER TABLE "MealRecord"
+  ADD COLUMN IF NOT EXISTS "confirmationStatus" "ConfirmationStatus" NOT NULL DEFAULT 'PENDING',
+  ADD COLUMN IF NOT EXISTS "confirmationSource" "ConfirmationSource",
+  ADD COLUMN IF NOT EXISTS "confirmedAt" timestamp(3);
 
 CREATE TABLE IF NOT EXISTS "AuditLog" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -89,5 +105,6 @@ CREATE INDEX IF NOT EXISTS "MealPrice_employeeId_validFrom_idx" ON "MealPrice"("
 CREATE INDEX IF NOT EXISTS "BillingPeriod_status_idx" ON "BillingPeriod"("status");
 CREATE INDEX IF NOT EXISTS "BillingPeriod_startDate_endDate_idx" ON "BillingPeriod"("startDate", "endDate");
 CREATE INDEX IF NOT EXISTS "MealRecord_periodId_date_idx" ON "MealRecord"("periodId", "date");
+CREATE INDEX IF NOT EXISTS "MealRecord_confirmationStatus_idx" ON "MealRecord"("confirmationStatus");
 CREATE INDEX IF NOT EXISTS "AuditLog_entity_entityId_idx" ON "AuditLog"("entity", "entityId");
 CREATE INDEX IF NOT EXISTS "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");

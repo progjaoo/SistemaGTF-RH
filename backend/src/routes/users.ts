@@ -1,12 +1,12 @@
 import bcrypt from "bcryptjs";
 import { Role } from "@prisma/client";
-import { Router } from "express";
+import express from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { authenticate, requireRole, type AuthenticatedRequest } from "../middleware/auth.js";
 
-export const usersRouter = Router();
+export const usersRouter = express.Router();
 
 usersRouter.use(authenticate, requireRole(Role.RH));
 

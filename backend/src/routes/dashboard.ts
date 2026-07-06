@@ -1,10 +1,10 @@
-import { Router } from "express";
+import express from "express";
 import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { authenticate } from "../middleware/auth.js";
 import { calculatePeriodSummary } from "../services/calculations.js";
 
-export const dashboardRouter = Router();
+export const dashboardRouter = express.Router();
 
 dashboardRouter.use(authenticate);
 

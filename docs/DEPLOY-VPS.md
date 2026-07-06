@@ -95,10 +95,13 @@ Nao coloque os `location` fora do `server`, nem dentro de outro `location`.
 location /sistema-rh-api/ {
     proxy_pass http://127.0.0.1:3334/api/;
     proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 75s;
 }
 
 location /sistema-rh/ {
@@ -212,6 +215,22 @@ pm2 logs sistema-rh-api
 curl http://127.0.0.1:3334/api/health
 curl https://portal88.com.br/sistema-rh-api/health
 ```
+
+## Realtime Socket.IO
+
+A API usa Socket.IO no mesmo processo Express, com path interno:
+
+```text
+/api/socket.io
+```
+
+No frontend de produção, `VITE_API_URL=https://portal88.com.br/sistema-rh-api` faz o cliente conectar em:
+
+```text
+https://portal88.com.br/sistema-rh-api/socket.io
+```
+
+Por isso o bloco Nginx de `/sistema-rh-api/` precisa manter os headers `Upgrade` e `Connection "upgrade"` mostrados acima. Sem esses headers, o fallback polling pode funcionar parcialmente, mas o WebSocket não fica confiável.
 
 ## Build do frontend
 

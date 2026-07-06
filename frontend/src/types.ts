@@ -2,6 +2,8 @@ export type Role = "RH" | "GESTORA";
 export type EmployeeStatus = "ACTIVE" | "INACTIVE";
 export type ScheduleType = "MON_FRI" | "MON_SUN" | "CUSTOM";
 export type BillingStatus = "OPEN" | "CLOSED";
+export type ConfirmationStatus = "PENDING" | "PEGUEI" | "NAO_PEGUEI";
+export type ConfirmationSource = "SISTEMA" | "WHATSAPP";
 
 export type User = {
   id: string;
@@ -35,6 +37,9 @@ export type MealRecord = {
   periodId: string;
   date: string;
   quantity: number;
+  confirmationStatus: ConfirmationStatus;
+  confirmationSource: ConfirmationSource | null;
+  confirmedAt: string | null;
   registeredById: string;
 };
 
@@ -86,4 +91,31 @@ export type ApiWarning = {
   employeeName: string;
   date: string;
   message: string;
+};
+
+export type EmployeePortalSearchResult = Pick<Employee, "id" | "name">;
+
+export type EmployeePortalDay = {
+  id: string;
+  date: string;
+  quantity: number;
+  confirmationStatus: ConfirmationStatus;
+  confirmationSource: ConfirmationSource | null;
+  confirmedAt: string | null;
+  period: Pick<BillingPeriod, "id" | "label" | "status">;
+};
+
+export type MealRecordConfirmation = {
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  quantity: number;
+  confirmationStatus: ConfirmationStatus;
+  confirmationSource: ConfirmationSource | null;
+  confirmedAt: string | null;
+};
+
+export type MealConfirmationRealtimePayload = {
+  periodId: string;
+  confirmation: MealRecordConfirmation;
 };

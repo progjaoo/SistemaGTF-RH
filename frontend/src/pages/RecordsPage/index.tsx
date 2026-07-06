@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CalendarCheck,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Download,
   FileText,
   Info,
@@ -42,15 +43,18 @@ import {
   SearchInputWrap,
   SortHint
 } from "../../components/records/styles";
-import { Button, EmptyState } from "../../components/ui";
+import { api } from "../../api";
+import { Badge, Button, DataTable, EmptyState, Panel, PanelHeader } from "../../components/ui";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
-import type { ApiWarning, BillingPeriod, Employee, MealPrice } from "../../types";
-import { dateRange, fullDate, longDate, weekday } from "../../utils/date";
+import { useMealConfirmationRealtime } from "../../hooks/useMealConfirmationRealtime";
+import type { ApiWarning, BillingPeriod, Employee, MealConfirmationRealtimePayload, MealPrice, MealRecordConfirmation } from "../../types";
+import { dateKeyInSaoPaulo, dateRange, fullDate, longDate, weekday } from "../../utils/date";
 import { initials, normalizeSearch } from "../../utils/format";
 import { scheduleLabels } from "../../utils/labels";
 import { buildMealExportSummary, exportMealConferencePdf, exportMealSpreadsheet } from "../../utils/mealReport";
 
 export default function RecordsPage({
+  token,
   employees,
   prices,
   period,
@@ -59,6 +63,7 @@ export default function RecordsPage({
   onChangeQuantity,
   onSave
 }: {
+  token: string;
   employees: Employee[];
   prices: MealPrice[];
   period: BillingPeriod;
@@ -68,6 +73,10 @@ export default function RecordsPage({
   onSave: () => Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
+  const [loadingConfirmations, setLoadingConfirmations] = useState(false);
+  const [confirmationScope, setConfirmationScope] = useState<"DAY" | "PERIOD" | null>(null);
+  const [confirmationError, setConfirmationError] = useState("");
+  const [confirmations, setConfirmations] = useState<MealRecordConfirmation[]>([]);
   const [selectedDate, setSelectedDate] = useState(period.startDate);
   const [employeeSearch, setEmployeeSearch] = useState("");
   const debouncedSearch = useDebouncedValue(employeeSearch);
@@ -75,8 +84,14 @@ export default function RecordsPage({
   const activeEmployees = useMemo(() => employees.filter((employee) => employee.status === "ACTIVE"), [employees]);
 
   useEffect(() => {
-    setSelectedDate(period.startDate);
-  }, [period.id, period.startDate]);
+    const today = dateKeyInSaoPaulo();
+    if (today >= period.startDate && today <= period.endDate) {
+      setSelectedDate(today);
+      return;
+    }
+
+    setSelectedDate(today > period.endDate ? period.endDate : period.startDate);
+  }, [period.id, period.endDate, period.startDate]);
 
   const selectedDateIndex = Math.max(0, dates.indexOf(selectedDate));
   const consumptionFrequency = useMemo(() => {
@@ -126,21 +141,63 @@ export default function RecordsPage({
   }
 
   const readOnly = period.status === "CLOSED";
+  const today = dateKeyInSaoPaulo();
+  const selectedDateIsFuture = selectedDate > today;
   const moveDate = (direction: -1 | 1) => {
     const nextDate = dates[selectedDateIndex + direction];
     if (nextDate) setSelectedDate(nextDate);
   };
   const changeDailyQuantity = (employee: Employee, nextValue: number) => {
-    if (readOnly) return;
+    if (readOnly || selectedDateIsFuture) return;
     const key = `${employee.id}:${selectedDate}`;
     onChangeQuantity(key, Math.max(0, Math.min(10, nextValue)));
   };
   const setVisibleQuantity = (quantity: number) => {
-    if (readOnly || visibleEmployees.length === 0) return;
+    if (readOnly || selectedDateIsFuture || visibleEmployees.length === 0) return;
     for (const employee of visibleEmployees) {
       onChangeQuantity(`${employee.id}:${selectedDate}`, quantity);
     }
   };
+  const loadConfirmations = async (scope: "DAY" | "PERIOD") => {
+    setLoadingConfirmations(true);
+    setConfirmationScope(scope);
+    setConfirmationError("");
+    try {
+      const response = await api.mealRecordConfirmations(token, period.id, scope === "DAY" ? selectedDate : undefined);
+      setConfirmations(response.confirmations);
+    } catch (error) {
+      setConfirmationError(error instanceof Error ? error.message : "Não foi possível carregar confirmações.");
+    } finally {
+      setLoadingConfirmations(false);
+    }
+  };
+  const applyRealtimeConfirmation = useCallback((payload: MealConfirmationRealtimePayload) => {
+    const nextConfirmation = payload.confirmation;
+    if (confirmationScope === "DAY" && nextConfirmation.date !== selectedDate) return;
+
+    setConfirmations((currentConfirmations) => {
+      const currentIndex = currentConfirmations.findIndex(
+        (confirmation) => confirmation.employeeId === nextConfirmation.employeeId && confirmation.date === nextConfirmation.date
+      );
+
+      const nextConfirmations =
+        currentIndex >= 0
+          ? currentConfirmations.map((confirmation, index) => (index === currentIndex ? nextConfirmation : confirmation))
+          : [...currentConfirmations, nextConfirmation];
+
+      return nextConfirmations.sort((first, second) => {
+        if (first.date !== second.date) return first.date.localeCompare(second.date);
+        return first.employeeName.localeCompare(second.employeeName, "pt-BR", { sensitivity: "base" });
+      });
+    });
+  }, [confirmationScope, selectedDate]);
+
+  useMealConfirmationRealtime({
+    token,
+    periodId: period.id,
+    enabled: Boolean(confirmationScope),
+    onConfirmation: applyRealtimeConfirmation
+  });
 
   return (
     <RecordsLayout>
@@ -154,7 +211,7 @@ export default function RecordsPage({
             <p>{readOnly ? "Período fechado para consulta" : "Registre as refeições do dia"}</p>
           </div>
         </RecordsTitle>
-        <SaveButton type="button" onClick={save} disabled={saving || readOnly}>
+        <SaveButton type="button" onClick={save} disabled={saving || readOnly || selectedDateIsFuture}>
           <Save size={20} />
           {saving ? "Salvando..." : "Salvar"}
         </SaveButton>
@@ -201,11 +258,11 @@ export default function RecordsPage({
 
         <BulkActions>
           <SortHint>{visibleEmployees.length} exibidos · Mais consumo primeiro, A-Z no empate</SortHint>
-          <Button type="button" onClick={() => setVisibleQuantity(1)} disabled={readOnly || visibleEmployees.length === 0}>
+          <Button type="button" onClick={() => setVisibleQuantity(1)} disabled={readOnly || selectedDateIsFuture || visibleEmployees.length === 0}>
             <CheckCircle2 size={17} />
             Marcar para todos os {visibleEmployees.length} exibidos
           </Button>
-          <Button type="button" $variant="ghost" onClick={() => setVisibleQuantity(0)} disabled={readOnly || visibleEmployees.length === 0}>
+          <Button type="button" $variant="ghost" onClick={() => setVisibleQuantity(0)} disabled={readOnly || selectedDateIsFuture || visibleEmployees.length === 0}>
             <X size={17} />
             Desmarcar exibidos
           </Button>
@@ -217,8 +274,71 @@ export default function RecordsPage({
             <FileText size={17} />
             Gerar PDF
           </Button>
+          <Button type="button" $variant="ghost" onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
+            <ClipboardCheck size={17} />
+            Verificar quem Pegou
+          </Button>
         </BulkActions>
       </RecordsTools>
+
+      {confirmationScope && (
+        <Panel>
+          <PanelHeader>
+            <div>
+              <h2>Verificar quem Pegou</h2>
+              <p>
+                {confirmationScope === "DAY" ? `Conferência de ${fullDate(selectedDate)}` : "Conferência do período inteiro"}
+                {" · Atualiza automaticamente"}
+              </p>
+            </div>
+            <BulkActions>
+              <Button type="button" $variant={confirmationScope === "DAY" ? "solid" : "ghost"} onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
+                Dia atual
+              </Button>
+              <Button type="button" $variant={confirmationScope === "PERIOD" ? "solid" : "ghost"} onClick={() => loadConfirmations("PERIOD")} disabled={loadingConfirmations}>
+                Período inteiro
+              </Button>
+              <Button type="button" $variant="ghost" onClick={() => setConfirmationScope(null)}>
+                Fechar
+              </Button>
+            </BulkActions>
+          </PanelHeader>
+
+          {confirmationError && <EmptyState>{confirmationError}</EmptyState>}
+          {!confirmationError && loadingConfirmations && <EmptyState>Carregando confirmações...</EmptyState>}
+          {!confirmationError && !loadingConfirmations && confirmations.length === 0 && (
+            <EmptyState>Nenhum lançamento encontrado para a conferência selecionada.</EmptyState>
+          )}
+          {!confirmationError && !loadingConfirmations && confirmations.length > 0 && (
+            <DataTable>
+              <thead>
+                <tr>
+                  <th>Funcionário</th>
+                  <th>Data</th>
+                  <th>Qtd.</th>
+                  <th>Status</th>
+                  <th>Origem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {confirmations.map((confirmation) => (
+                  <tr key={`${confirmation.employeeId}:${confirmation.date}`}>
+                    <td>{confirmation.employeeName}</td>
+                    <td>{fullDate(confirmation.date)}</td>
+                    <td>{confirmation.quantity}</td>
+                    <td>
+                      <Badge $tone={confirmation.confirmationStatus === "PEGUEI" ? "good" : confirmation.confirmationStatus === "NAO_PEGUEI" ? "warn" : "muted"}>
+                        {confirmation.confirmationStatus === "PEGUEI" ? "Peguei" : confirmation.confirmationStatus === "NAO_PEGUEI" ? "Não peguei" : "Pendente"}
+                      </Badge>
+                    </td>
+                    <td>{confirmation.confirmationSource === "SISTEMA" ? "Sistema" : confirmation.confirmationSource === "WHATSAPP" ? "WhatsApp" : "Sem confirmação"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </DataTable>
+          )}
+        </Panel>
+      )}
 
       <EmployeeCards aria-label="Lançamentos por funcionário">
         {visibleEmployees.length === 0 && (
@@ -242,7 +362,7 @@ export default function RecordsPage({
                 <QuantityButton
                   type="button"
                   onClick={() => changeDailyQuantity(employee, quantity - 1)}
-                  disabled={readOnly || quantity <= 0}
+                  disabled={readOnly || selectedDateIsFuture || quantity <= 0}
                   aria-label={`Diminuir refeições de ${employee.name}`}
                 >
                   <Minus size={20} />
@@ -254,7 +374,7 @@ export default function RecordsPage({
                 <QuantityButton
                   type="button"
                   onClick={() => changeDailyQuantity(employee, quantity + 1)}
-                  disabled={readOnly || quantity >= 10}
+                  disabled={readOnly || selectedDateIsFuture || quantity >= 10}
                   aria-label={`Aumentar refeições de ${employee.name}`}
                 >
                   <Plus size={20} />
@@ -276,6 +396,8 @@ export default function RecordsPage({
         <span>
           {warningsForDate.length > 0
             ? "Há quantidades fora do tipo de jornada programada para a data."
+            : selectedDateIsFuture
+              ? "Datas futuras ficam bloqueadas para lançamento."
             : `Os registros são salvos apenas para ${fullDate(selectedDate)}.`}
         </span>
       </SaveStatus>

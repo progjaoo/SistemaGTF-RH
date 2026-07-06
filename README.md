@@ -48,6 +48,10 @@ Consulte a senha atual no seed do backend ou na documentacao operacional interna
 
 O guia consolidado de producao esta em [`docs/DEPLOY-VPS.md`](docs/DEPLOY-VPS.md).
 
+## Documentação
+
+O índice principal de guidelines, padrões e operação está em [`docs/README.md`](docs/README.md).
+
 ## Docker
 
 O Compose cria um container próprio chamado `sistema-rh-postgres` usando `postgres:16-alpine`.
