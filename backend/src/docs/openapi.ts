@@ -105,6 +105,7 @@ export const openApiDocument = {
           value: { type: "number", example: 8.5 },
           validFrom: { type: "string", format: "date", example: "2026-06-01" },
           validTo: { type: "string", format: "date", nullable: true },
+          status: { type: "string", enum: ["VIGENTE", "FUTURA", "ENCERRADA"] },
           employeeId: { type: "string", format: "uuid", nullable: true }
         }
       },
@@ -377,19 +378,54 @@ export const openApiDocument = {
     "/meal-prices": {
       get: {
         tags: ["Meal Prices"],
-        summary: "Lista preços de almoço",
+        summary: "Lista preços com status de vigência",
         security: [{ bearerAuth: [] }],
-        responses: { "200": { description: "Lista de preços" } }
+        responses: { "200": { description: "Lista de preços (VIGENTE/FUTURA/ENCERRADA)" } }
       },
       post: {
         tags: ["Meal Prices"],
         summary: "Cria preço com vigência",
+        description: "422 se sobrepuser vigência do mesmo escopo.",
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
           content: { "application/json": { schema: { $ref: "#/components/schemas/MealPriceInput" } } }
         },
-        responses: { "201": { description: "Preço criado" } }
+        responses: { "201": { description: "Preço criado" }, "422": { description: "Sobreposição ou vigência inválida" } }
+      }
+    },
+    "/meal-prices/{id}": {
+      put: {
+        tags: ["Meal Prices"],
+        summary: "Edita preço e vigência (RH)",
+        description: "409 se a vigência cruzar período fechado; 422 em sobreposição no mesmo escopo.",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/MealPriceInput" } } }
+        },
+        responses: {
+          "200": { description: "Preço atualizado" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Preço não encontrado" },
+          "409": { description: "Histórico em período fechado" },
+          "422": { description: "Sobreposição ou vigência inválida" }
+        }
+      }
+    },
+    "/meal-prices/{id}/close": {
+      post: {
+        tags: ["Meal Prices"],
+        summary: "Encerra vigência sem apagar (RH)",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          "200": { description: "Vigência encerrada" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Preço não encontrado" },
+          "422": { description: "Data final anterior ao início" }
+        }
       }
     },
     "/meal-records": {
