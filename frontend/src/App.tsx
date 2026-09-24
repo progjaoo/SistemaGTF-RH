@@ -1,10 +1,10 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarCheck, Search, ShieldCheck, Soup, Users, WalletCards, X } from "lucide-react";
+import { CalendarCheck, Search, ShieldCheck, Soup, Users, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { api } from "./api";
 import { Eyebrow, Main, Shell, Sidebar, Toolbar, Topbar } from "./components/layout";
-import { Alert, Button, IconButton, Loading } from "./components/ui";
+import { Button, Loading } from "./components/ui";
 import { useSession } from "./hooks/useSession";
 import { useSidebarCollapsed } from "./hooks/useSidebarCollapsed";
 import type { NavigationTab, Tab } from "./navigation";
@@ -33,7 +33,6 @@ export default function App() {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [warnings, setWarnings] = useState<ApiWarning[]>([]);
   const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState("");
 
   const selectedPeriod = useMemo(
     () => periods.find((period) => period.id === selectedPeriodId) ?? periods[0],
@@ -58,7 +57,6 @@ export default function App() {
 
   const loadWorkspace = useCallback(async (currentSession: NonNullable<typeof session>, preferredPeriodId?: string) => {
     setLoading(true);
-    setNotice("");
 
     try {
       const [periodResponse, employeeResponse, priceResponse, userResponse] = await Promise.all([
@@ -83,7 +81,7 @@ export default function App() {
       setSelectedPeriodId(nextPeriodId);
       await loadPeriodData(currentSession.token, nextPeriodId);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Erro ao carregar dados.");
+      toast.error(error instanceof Error ? error.message : "Erro ao carregar dados.");
     } finally {
       setLoading(false);
     }
@@ -167,15 +165,6 @@ export default function App() {
             </Button>
           </Toolbar>
         </Topbar>
-
-        {notice && (
-          <Alert>
-            <span>{notice}</span>
-            <IconButton type="button" title="Fechar aviso" onClick={() => setNotice("")}>
-              <X size={16} />
-            </IconButton>
-          </Alert>
-        )}
 
         {loading && <Loading>Carregando dados...</Loading>}
 

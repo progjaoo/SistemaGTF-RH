@@ -27,11 +27,11 @@ Implementar e revisar telas React com foco em operação densa, responsividade m
 |---|---|---|
 | React + ReactDOM | 18.3.1 | `frontend/package.json` |
 | Vite | 6.4.3 | `frontend/package.json` |
-| styled-components (+ types) | 6.1.19 | `frontend/package.json` |
+| Tailwind CSS + `@tailwindcss/vite` | 4.3.3 | `frontend/package.json` (+ shadcn new-york, Radix, `sonner`, `cva`, `tailwind-merge`) |
 | lucide-react | 0.468.0 | `frontend/package.json` |
 | Recharts | 2.15.x | `frontend/package.json` (v3 existe — **não** migrar sem plano) |
 | socket.io-client | 4.8.3 | `frontend/package.json` |
-| react-day-picker + date-fns | a definir no PLAN-001 | Context7 `/gpbl/react-day-picker` |
+| react-day-picker + date-fns | 9.14.0 + 3.6.0 | Travado no PLAN-001 (Context7 `/gpbl/react-day-picker`) |
 
 ## React 18 — Disciplina de Hooks (fonte: Context7 `/reactjs/react.dev`, docs oficiais)
 
@@ -41,7 +41,12 @@ Implementar e revisar telas React com foco em operação densa, responsividade m
 - **Debounce em busca textual** (portal e filtros); estado local perto do uso; hooks genéricos em `hooks/`, funções puras em `utils/`.
 - `App.tsx` é orquestrador (sessão, tab, shell) — JSX de tela não mora nele.
 
-## styled-components v6 (fonte: Context7 `/websites/styled-components`, docs oficiais)
+## styled-components v6 — REMOVIDO (histórico)
+
+> Migração PLAN-002: styled-components foi desinstalado. Não reintroduzir.
+> Tokens agora vivem no `@theme` de `src/index.css`; primitivos em `components/ui`.
+
+(Seções abaixo preservadas como referência da migração concluída.)
 
 - **Props transientes com `$`**: `styled.button<{ $active: boolean }>` — o prefixo `$` impede que a prop vaze para o DOM (padrão já usado em `DayCheckin.tsx:102`). Sem `$`, o React reclama de atributo desconhecido.
 - Para wrappers de componentes próprios, aceitar `className?` opcional; para filtrar props em componentes de terceiros, `shouldForwardProp` ou `.attrs`.
@@ -74,6 +79,13 @@ Guia para PLAN-001 §3 (grade mensal real em `pt-BR`):
 ## Responsividade (breakpoints do repo)
 
 `@media (max-width: 900px / 720px / 520px)`. Sidebar vira navegação compacta; tabelas com overflow horizontal ou viram cards; sem altura fixa em telas longas; portal prioriza celular (`docs/FRONTEND.md:140-159`).
+
+## Padrões (pós PLAN-002)
+
+- Tailwind v4 com tokens do `@theme` (`bg-teal`, `text-ink`...); shadcn em `components/ui`; `cn()` para classes condicionais.
+- `toast.*` (sonner) para feedback; `Dialog` no lugar de `window.confirm`; `Skeleton` para loading.
+- lucide-react para ícones; Vite com code-split (react, radix, charts, sheet, calendar, notify).
+- API via `frontend/src/api.ts`.
 
 ## Responsabilidades
 

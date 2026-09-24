@@ -12,7 +12,9 @@
 - React 18.
 - TypeScript.
 - Vite.
-- styled-components.
+- Tailwind CSS v4 (`@tailwindcss/vite`) + shadcn (new-york) + Radix.
+- `sonner` para toasts.
+- `@fontsource/outfit` para tipografia.
 - lucide-react para ícones.
 - Recharts para gráficos.
 

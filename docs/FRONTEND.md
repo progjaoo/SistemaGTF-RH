@@ -12,16 +12,31 @@ Evite aparência de landing page. Telas internas devem ser densas, organizadas e
 frontend/src/
 ├── App.tsx
 ├── api.ts
+├── main.tsx
+├── index.css
+├── lib/
+│   └── utils.ts
 ├── components/
 │   ├── layout/
 │   ├── records/
+│   ├── employee-portal/
 │   └── ui/
 ├── hooks/
 ├── pages/
 ├── utils/
-├── styles.ts
 └── types.ts
 ```
+
+## Estilização
+
+O projeto usa **Tailwind CSS v4** (plugin `@tailwindcss/vite`) + **shadcn** (new-york) + **Radix**.
+
+- Tema em `src/index.css` (`@theme`): tokens Genesis (`teal`, `gold`, `coral`, `cream`, `sky`, `paper`, `success`, `danger`, `ink`, `muted`, `line`) + fonte Outfit via `@fontsource`.
+- Utilitário `cn()` em `src/lib/utils.ts` (clsx + tailwind-merge).
+- Alias `@/*` → `src/*` (`vite.config.ts` + `tsconfig.json`).
+- Componentes shadcn em `components/ui` (`button`, `input`, `label`, `badge`, `dialog`, `skeleton`, `checkbox`, `select`, `separator`, `sonner`).
+- CSS de terceiros (react-day-picker do portal) mora em `index.css` sob `.portal-calendar`.
+- styled-components foi removido: não reintroduzir.
 
 ## App
 
@@ -87,29 +102,53 @@ Use essa pasta para regras visuais da grade, cards de funcionário, filtros e co
 
 ### `components/employee-portal`
 
-Componentes específicos do portal público do colaborador:
+Componentes específicos do portal público do colaborador (Tailwind, sem styled):
 
-- busca por nome (`NameSearch`);
-- etapa do código de 6 dígitos (`AccessCodeStep`);
-- calendário mensal com `react-day-picker` v9 + locale `date-fns/pt-BR` (`EmployeeCalendar`);
-- detalhe do dia com regras hoje/atrasado/confirmado (`DayCheckin`).
+- busca por nome (portal);
+- calendário mensal com `react-day-picker` v9 + locale `date-fns/pt-BR`;
+- confirmação `Peguei` / `Não peguei`;
+- etapa do código de 6 dígitos.
 
-Devem ser mobile-first, com botões grandes e sessão do portal em `sessionStorage` (token 8h — nunca `localStorage` permanente). A grade usa `modifiers` (`launched`, `confirmed`, `late`, `closed`), `disabled` para o futuro e `endMonth` para travar além do mês atual.
+Sessão do portal em `sessionStorage` (token 8h — nunca `localStorage` permanente). Toasts de check-in via mini-`Toaster` do ramo portal no `App`.
+
+Devem ser mobile-first, com botões grandes (≥44px).
 
 ## Estilização
 
-O projeto usa `styled-components`.
+O projeto usa **Tailwind CSS v4** (plugin `@tailwindcss/vite`) + **shadcn** (new-york) + **Radix**.
 
 Padrões:
 
-- styled-components específicos ficam junto do componente ou page.
-- componentes genéricos ficam em `components/ui`.
-- tokens globais ficam em `styles.ts`.
-- não criar CSS global novo sem necessidade.
+- classes utilitárias com tokens do `@theme` (`bg-teal`, `text-ink`, `border-line`...);
+- `components/ui` para primitivos (`Button`, `Input`, `Badge`, `Dialog`, `Toaster`...);
+- compor com `cn()` em vez de template string condicional;
+- feedback via `toast.*` (sonner); erro inline no form + toast para o global;
+- `Dialog` do Radix no lugar de `window.confirm`, com foco inicial e Esc;
+- `Skeleton` para loading de grades/tabelas;
+- botões com `:active:scale` (já global no `index.css`).
+
+## Toasts
+
+`<Toaster/>` montado no `App` (3 ramos: shell, login, portal). Mapa: login/logout, salvar/importar/fechar/reabrir/CRUDs, check-in do portal (`PEGUEI` success, `NAO_PEGUEI` info). Falha de API sempre gera `toast.error` com a mensagem (nunca stack).
 
 ## Paleta
 
-Tokens principais:
+Tokens do `@theme` em `src/index.css`:
+
+```text
+teal / teal-hover / teal-deep / teal-bg
+gold / gold-soft / gold-deep
+coral / coral-deep
+cream / sky / paper
+success / danger
+ink / muted / line
+```
+
+Prefira esses tokens antes de criar cores soltas. Teal é o acento dominante; gold/coral só em destaque pontual.
+
+## Paleta (legado — ver `@theme` em `frontend/src/index.css`)
+
+Tokens principais (era styled-components, agora Tailwind):
 
 ```text
 --ink

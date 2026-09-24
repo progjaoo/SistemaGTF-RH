@@ -57,7 +57,7 @@ Os agentes embutem orientação versionada das libs abaixo. Não sugerir upgrade
 |---|---|---|
 | React + ReactDOM | 18.3.1 | `/reactjs/react.dev` (hooks, effects, memo) |
 | Vite | 6.4.3 | `/websites/vite_dev` (env `VITE_*`, build) |
-| styled-components | 6.1.19 | `/websites/styled-components` (transient props `$`, TS) |
+| Tailwind CSS + shadcn + Radix + sonner | 4.x / new-york / 2.x | PLAN-002 (tema Genesis em `@theme`, sem styled-components) |
 | Express | 4.21.2 | padrões Express 4 do repo |
 | Zod | 3.25.67 | `/colinhacks/zod` — **atenção: docs atuais cobrem v4; aqui vale v3** (`errorMap`, `.flatten()`) |
 | Prisma | 6.10.1 | `/websites/prisma_io` (`migrate deploy`, `resolve`, `diff`) |

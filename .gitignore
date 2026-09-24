@@ -6,4 +6,5 @@ dist/
 .env.local
 coverage/
 *.log
+.superpowers/
 backend/prisma/migrations/*/migration_lock.toml
