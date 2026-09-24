@@ -101,6 +101,14 @@ export default function EmployeesPage({
   const [batchCodes, setBatchCodes] = useState<Array<{ employeeId: string; employeeName: string; code: string }> | null>(null);
   const [delivered, setDelivered] = useState<Record<string, boolean>>({});
   const [revokeTarget, setRevokeTarget] = useState<Employee | null>(null);
+  const [inactivateTarget, setInactivateTarget] = useState<Employee | null>(null);
+
+  async function confirmInactivate() {
+    if (!inactivateTarget) return;
+    const employee = inactivateTarget;
+    setInactivateTarget(null);
+    await onInactivate(employee.id);
+  }
 
   async function generateCode(employee: Employee) {
     setCodeBusy(employee.id);
@@ -265,7 +273,7 @@ export default function EmployeesPage({
                   <td>
                     <InlineActions>
                       <Button type="button" onClick={() => startEdit(employee)}>Editar</Button>
-                      <Button type="button" variant="outline" onClick={() => onInactivate(employee.id)}>Inativar</Button>
+                      <Button type="button" variant="outline" onClick={() => setInactivateTarget(employee)}>Inativar</Button>
                       {employee.hasAccessCode ? (
                         <>
                           <Button type="button" variant="outline" onClick={() => void generateCode(employee)} disabled={codeBusy === employee.id}>
@@ -372,6 +380,25 @@ export default function EmployeesPage({
             </Button>
             <Button type="button" variant="danger" onClick={() => void confirmRevoke()}>
               Revogar acesso
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={inactivateTarget !== null} onOpenChange={(open) => { if (!open) setInactivateTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Inativar funcionário?</DialogTitle>
+            <DialogDescription>
+              Inativar <strong>{inactivateTarget?.name}</strong>? O histórico é preservado e o acesso ao portal é mantido conforme o código (revogue separadamente se preciso).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setInactivateTarget(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="danger" onClick={() => void confirmInactivate()}>
+              Inativar
             </Button>
           </DialogFooter>
         </DialogContent>

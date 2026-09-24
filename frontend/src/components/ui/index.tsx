@@ -33,7 +33,7 @@ export function Panel({ children, className }: { children: ReactNode; className?
 
 export function PanelHeader({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-[14px] flex items-center justify-between gap-3 max-[520px]:flex-col max-[520px]:items-start [&>div>h2]:m-0 [&>div>h2]:text-[1.05rem] [&>div>p]:mt-1 [&>div>p]:text-[0.9rem] [&>div>p]:text-muted [&>h2]:m-0 [&>h2]:text-[1.05rem]">
+    <div className="mb-[14px] flex items-center justify-between gap-3 max-[520px]:flex-col max-[520px]:items-start [&>div>h2]:m-0 [&>div>h2]:font-display [&>div>h2]:text-2xl [&>div>h2]:font-bold [&>div>p]:mt-1 [&>div>p]:text-[0.9rem] [&>div>p]:text-muted [&>h2]:m-0 [&>h2]:font-display [&>h2]:text-2xl [&>h2]:font-bold">
       {children}
     </div>
   );

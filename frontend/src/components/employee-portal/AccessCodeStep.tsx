@@ -21,7 +21,7 @@ export function AccessCodeStep({
   return (
     <section className="grid w-[min(520px,100%)] gap-[18px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_48px_rgb(32_38_44/0.08)]">
       <div>
-        <h1 className="m-0 text-[clamp(1.5rem,6vw,2.1rem)]">Olá, {employee.name}</h1>
+        <h1 className="m-0 font-display text-[clamp(1.5rem,6vw,2.1rem)] font-bold">Olá, {employee.name}</h1>
         <p className="mt-2 text-muted">Digite seu código de acesso de 6 dígitos (entregue pelo RH).</p>
       </div>
 

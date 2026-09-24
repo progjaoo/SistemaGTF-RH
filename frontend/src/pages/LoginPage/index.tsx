@@ -31,13 +31,13 @@ export default function LoginPage({ onLogin }: { onLogin: (email: string, passwo
           </div>
           <div className="max-w-[470px]">
             <span className="block text-[clamp(0.6rem,1vw,0.92rem)] font-bold uppercase text-teal-hover">GTF - Recursos Humanos</span>
-            <strong className="mt-[14px] block text-[clamp(1rem,2.5vw,4rem)] font-black uppercase leading-[0.98] text-white max-md:mt-[10px] max-md:text-[clamp(2rem,9vw,3.4rem)]">Controle de Almoços</strong>
+            <strong className="mt-[14px] block font-display text-[clamp(1rem,2.5vw,4.5rem)] font-bold uppercase leading-[0.98] text-white max-md:mt-[10px] max-md:text-[clamp(2rem,9vw,3.4rem)]">Controle de Almoços</strong>
           </div>
         </aside>
 
         <section className="flex min-w-0 flex-col items-center justify-center rounded-r-[28px] bg-surface p-[clamp(34px,4.2vw,56px)] max-md:rounded-none max-sm:p-6">
           <div className="mb-[26px] w-[min(390px,100%)]">
-            <h1 className="m-0 text-[clamp(1rem,2vw,1.45rem)] font-black leading-none text-ink">Entrar no painel</h1>
+            <h1 className="m-0 font-display text-[clamp(1rem,2vw,1.45rem)] font-bold leading-none text-ink">Entrar no painel</h1>
           </div>
 
           <form onSubmit={submit} className="grid w-[min(390px,100%)] gap-4">

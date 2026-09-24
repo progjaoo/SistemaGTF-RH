@@ -83,7 +83,9 @@ Guia para PLAN-001 §3 (grade mensal real em `pt-BR`):
 ## Padrões (pós PLAN-002)
 
 - Tailwind v4 com tokens do `@theme` (`bg-teal`, `text-ink`...); shadcn em `components/ui`; `cn()` para classes condicionais.
-- `toast.*` (sonner) para feedback; `Dialog` no lugar de `window.confirm`; `Skeleton` para loading.
+- Sidebar shadcn (`collapsible="icon"`, 280px/56px) — nunca grade manual para o shell.
+- Tipografia: General Sans (títulos, `font-display`) + DM Sans 15px (texto).
+- `toast.*` (sonner) para feedback; `Dialog` no lugar de `window.confirm` (logout, fechar/reabrir período, inativar, revogar); `Skeleton` para loading.
 - lucide-react para ícones; Vite com code-split (react, radix, charts, sheet, calendar, notify).
 - API via `frontend/src/api.ts`.
 

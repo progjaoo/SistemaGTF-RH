@@ -2,9 +2,20 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react
 import { CalendarCheck, Search, ShieldCheck, Soup, Users, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "./api";
-import { Eyebrow, Main, Shell, Sidebar, Toolbar, Topbar } from "./components/layout";
-import { Button, Loading } from "./components/ui";
+import { Eyebrow, Main, Sidebar, Toolbar, Topbar } from "./components/layout";
+import { Loading } from "./components/ui";
 import { useSession } from "./hooks/useSession";
 import { useSidebarCollapsed } from "./hooks/useSidebarCollapsed";
 import type { NavigationTab, Tab } from "./navigation";
@@ -22,7 +33,9 @@ const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 
 export default function App() {
   const { session, handleLogin, handleLogout } = useSession();
-  const { sidebarCollapsed, toggleSidebar } = useSidebarCollapsed();
+  const { sidebarCollapsed, setCollapsed } = useSidebarCollapsed();
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [confirmClose, setConfirmClose] = useState<BillingPeriod | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [prices, setPrices] = useState<MealPrice[]>([]);
@@ -133,24 +146,30 @@ export default function App() {
   ] satisfies NavigationTab[]).filter((tab) => !tab.rhOnly || isRh);
 
   return (
-    <>
-    <Shell collapsed={sidebarCollapsed}>
-      <Sidebar
-        tabs={tabs}
-        activeTab={activeTab}
-        collapsed={sidebarCollapsed}
-        user={session.user}
-        onChangeTab={setActiveTab}
-        onToggle={toggleSidebar}
-        onLogout={logout}
-      />
+    <SidebarProvider
+      open={!sidebarCollapsed}
+      onOpenChange={(open) => setCollapsed(!open)}
+      style={{ "--sidebar-width": "17.5rem", "--sidebar-width-icon": "3.5rem" } as React.CSSProperties}
+    >
+      <TooltipProvider>
+        <Sidebar
+          tabs={tabs}
+          activeTab={activeTab}
+          user={session.user}
+          onChangeTab={setActiveTab}
+          onLogout={() => setConfirmLogout(true)}
+        />
 
-      <Main>
-        <Topbar>
-          <div>
-            <Eyebrow>{selectedPeriod ? `${fullDate(selectedPeriod.startDate)} a ${fullDate(selectedPeriod.endDate)}` : "Sem período"}</Eyebrow>
-            <h1 className="mt-1 text-[clamp(1.4rem,2.4vw,2.4rem)] max-[820px]:text-[1.35rem] max-[820px]:leading-[1.15] max-[820px]:wrap-anywhere">{selectedPeriod?.label ?? "Sistema RH - Grupo GTF"}</h1>
-          </div>
+        <SidebarInset>
+          <Main>
+          <Topbar>
+            <div className="flex items-center gap-3">
+              <SidebarTrigger aria-label="Alternar menu" />
+              <div>
+                <Eyebrow>{selectedPeriod ? `${fullDate(selectedPeriod.startDate)} a ${fullDate(selectedPeriod.endDate)}` : "Sem período"}</Eyebrow>
+                <h1 className="mt-1 font-display text-[32px] font-bold leading-none max-[820px]:text-[1.35rem] max-[820px]:leading-[1.15] max-[820px]:wrap-anywhere">{selectedPeriod?.label ?? "Sistema RH - Grupo GTF"}</h1>
+              </div>
+            </div>
           <Toolbar>
             <select value={selectedPeriodId} onChange={(event) => setSelectedPeriodId(event.target.value)}>
               {periods.map((period) => (
@@ -249,9 +268,7 @@ export default function App() {
               toast.success("Período criado.");
             }}
             onClose={async (period) => {
-              await api.closePeriod(session.token, period.id);
-              await loadWorkspace(session);
-              toast.success("Período fechado.");
+              setConfirmClose(period);
             }}
             onReopen={async (period) => {
               await api.reopenPeriod(session.token, period.id);
@@ -274,11 +291,67 @@ export default function App() {
             }}
           />
         )}
-      </Main>
-      </Shell>
-      {/* Toaster fora do grid: a section vazia do sonner (sem toasts) é
-          position:static e roubaria uma coluna se fosse filha do Shell. */}
+          </Main>
+        </SidebarInset>
+      </TooltipProvider>
+      {/* Toaster fora do layout: a section vazia do sonner (sem toasts) é
+          position:static e não pode ser filha de grade flexível. */}
       <Toaster position="top-center" />
-    </>
+
+      <Dialog open={confirmLogout} onOpenChange={(open) => { if (!open) setConfirmLogout(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sair do sistema?</DialogTitle>
+            <DialogDescription>
+              Sua sessão será encerrada e será preciso entrar de novo para continuar.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirmLogout(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => {
+                setConfirmLogout(false);
+                logout();
+              }}
+            >
+              Sair
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmClose !== null} onOpenChange={(open) => { if (!open) setConfirmClose(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Fechar período?</DialogTitle>
+            <DialogDescription>
+              Fechar <strong>{confirmClose?.label}</strong> congela os totais e bloqueia lançamentos e confirmações. É possível reabrir depois com confirmação.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirmClose(null)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                if (!confirmClose) return;
+                const period = confirmClose;
+                setConfirmClose(null);
+                await api.closePeriod(session.token, period.id);
+                await loadWorkspace(session);
+                toast.success("Período fechado.");
+              }}
+            >
+              Fechar período
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </SidebarProvider>
   );
 }

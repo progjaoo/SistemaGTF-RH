@@ -127,6 +127,22 @@ Padrões:
 - `Skeleton` para loading de grades/tabelas;
 - botões com `:active:scale` (já global no `index.css`).
 
+## Sidebar (shadcn)
+
+`components/layout/Sidebar.tsx` usa o bloco shadcn (`SidebarProvider`, `Sidebar`, `SidebarMenu/Button`, `SidebarInset`, `SidebarTrigger`, `TooltipProvider`):
+
+- `collapsible="icon"`: expandida 280px (`--sidebar-width: 17.5rem`), recolhida 56px (`--sidebar-width-icon: 3.5rem`).
+- Estado em `useSidebarCollapsed` (localStorage) ligado em `open/onOpenChange` do provider.
+- Cores Genesis aplicadas no próprio `ui/sidebar.tsx` (fundo teal-ink, ativo com borda gold); sem `dark:`.
+- Mobile: drawer (Sheet) via `SidebarTrigger` no Topbar.
+- NUNCA colocar componente com renderização condicional de grid/flex como filho direto de grade (lição do hotfix Toaster × Shell).
+
+## Tipografia
+
+- Títulos: **General Sans** bold (self-hosted em `src/assets/fonts`, sem request externo) — classe `font-display`.
+- Texto: **DM Sans** regular, corpo 15px (`--font-sans`, `@fontsource/dm-sans`).
+- Escala: display 72 (hero do login), headline 60, seção 32 (título da Topbar), subhead 24 (títulos de painel), body 15, small 13, caption 12, overline 11.
+
 ## Toasts
 
 `<Toaster/>` montado no `App` (3 ramos: shell, login, portal). Mapa: login/logout, salvar/importar/fechar/reabrir/CRUDs, check-in do portal (`PEGUEI` success, `NAO_PEGUEI` info). Falha de API sempre gera `toast.error` com a mensagem (nunca stack).

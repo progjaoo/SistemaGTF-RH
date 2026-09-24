@@ -15,5 +15,10 @@ export function useSidebarCollapsed() {
     });
   };
 
-  return { sidebarCollapsed, toggleSidebar };
+  const setCollapsed = (next: boolean) => {
+    localStorage.setItem(sidebarCollapsedKey, String(next));
+    setSidebarCollapsed(next);
+  };
+
+  return { sidebarCollapsed, toggleSidebar, setCollapsed };
 }
