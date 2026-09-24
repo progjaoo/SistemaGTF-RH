@@ -109,7 +109,11 @@ Componentes específicos do portal público do colaborador (Tailwind, sem styled
 - confirmação `Peguei` / `Não peguei`;
 - etapa do código de 6 dígitos.
 
-Sessão do portal em `sessionStorage` (token 8h — nunca `localStorage` permanente). Toasts de check-in via mini-`Toaster` do ramo portal no `App`.
+Sessão do portal em `sessionStorage` (turno 8h) ou `localStorage` com "manter conectado" (30d — nunca sem consentimento). Toasts de check-in via mini-`Toaster` do ramo portal no `App`.
+
+## PWA do portal
+
+Instalável a partir de `/colaborador/`: manifest + service worker via `vite-plugin-pwa` (`registerType: prompt`), ícones gerados do logo (`scripts/gen-pwa-icons.mjs` → `public/pwa-*.png`), API sempre `NetworkOnly` (nunca cachear lançamentos/confirmações). Botão "Instalar app" aparece quando o navegador dispara `beforeinstallprompt`. Requer HTTPS em produção (ok em `portal88.com.br`).
 
 Devem ser mobile-first, com botões grandes (≥44px).
 

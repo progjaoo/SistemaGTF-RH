@@ -512,7 +512,8 @@ export const openApiDocument = {
                 required: ["employeeId", "code"],
                 properties: {
                   employeeId: { type: "string", format: "uuid" },
-                  code: { type: "string", pattern: "^\\d{6}$", example: "482917" }
+                  code: { type: "string", pattern: "^\\d{6}$", example: "482917" },
+                  remember: { type: "boolean", description: "Manter conectado: token de 30d em vez de 8h" }
                 }
               }
             }

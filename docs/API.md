@@ -59,8 +59,11 @@ Authorization: Bearer TOKEN
 
 ## Preços
 
-- `GET /meal-prices`
-- `POST /meal-prices` RH
+- `GET /meal-prices` — cada preço traz `status`: `VIGENTE` | `FUTURA` | `ENCERRADA` (contra o hoje da VPS).
+- `POST /meal-prices` RH — 422 em sobreposição de vigência no mesmo escopo.
+- `PUT /meal-prices/:id` RH — edita valor/vigência/escopo; 422 em sobreposição; **409** se a vigência cruzar período fechado.
+- `POST /meal-prices/:id/close` RH — corpo `{ endDate }`; encerra sem apagar.
+- Sem DELETE: preços alimentam relatórios fechados; encerrar é o caminho.
 
 ## Lançamentos
 
@@ -93,7 +96,7 @@ Acesso por **nome + código de 6 dígitos** (código definido pelo RH em Funcion
 Rotas:
 
 - `GET /employee-portal/search?name=...` — pública com rate-limit; retorna `id`, `name` e `hasAccess`
-- `POST /employee-portal/login` — pública com rate-limit estrito (10/min); corpo `{ employeeId, code }`; retorna token de 8h
+- `POST /employee-portal/login` — pública com rate-limit estrito (10/min); corpo `{ employeeId, code, remember? }`; retorna `{ token, employee, portalStatus: "active" }`; com `remember: true`, token de 30d (manter conectado), senão 8h; o primeiro login preenche a ativação (auditoria `PORTAL_ACTIVATED`)
 - `GET /employee-portal/:employeeId/calendar?month=YYYY-MM` — exige token do próprio funcionário
 - `POST /employee-portal/:employeeId/checkin` — exige token do próprio funcionário
 
@@ -200,6 +203,7 @@ Payload de `meal-confirmation:updated`:
 - `PUT /employees/:id/access-code` RH — corpo opcional `{ code: "482917" }`; sem corpo, gera 6 dígitos. Retorna o código **uma única vez**.
 - `DELETE /employees/:id/access-code` RH — revoga o acesso.
 - `POST /employees/access-codes/batch` RH — gera para todos os ativos sem código; lista retornada **uma única vez**.
+- `GET /employees` inclui `portalAccess`: `none` (sem código) | `pending` (código gerado, nunca usado) | `active` (já entrou).
 
 ## Manutenção da Documentação
 

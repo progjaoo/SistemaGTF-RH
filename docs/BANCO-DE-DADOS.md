@@ -54,7 +54,7 @@ Funcionário deve ser inativado, não apagado, para preservar histórico.
 
 `workdays` guarda os dias esperados como CSV (`0`=dom .. `6`=sáb, ex: `"1,2,3,4,5,6"` para seg–sáb). `null` = segue o `scheduleType`. A API expõe como array (`[1,2,3,4,5,6]`) e aceita o array em `POST`/`PUT` (1–7 valores de 0–6; `null` limpa). O aviso de jornada no bulk usa os dias explícitos quando presentes — sem bloquear.
 
-`accessCodeHash` guarda o bcrypt do código de 6 dígitos do portal; `null` = sem acesso. `accessCodeUpdatedAt` registra a última emissão. A API **nunca** expõe o hash — só `hasAccessCode` (admin) e `hasAccess` (busca do portal).
+`accessCodeHash` guarda o bcrypt do código de 6 dígitos do portal; `null` = sem acesso. `accessCodeUpdatedAt` registra a última emissão. `firstPortalAccessAt` marca a ativação (primeiro login com código; `null` = pendente). A API **nunca** expõe o hash — só `hasAccessCode` e `portalAccess` (`none`|`pending`|`active`).
 
 ### `MealPrice`
 

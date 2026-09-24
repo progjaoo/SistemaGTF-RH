@@ -12,6 +12,10 @@ Este documento consolida o fluxo de producao usado no Sistema RH Grupo GTF em `p
 - Frontend: React/Vite compilado em `frontend/dist` e servido pelo Nginx
 - Swagger: `https://portal88.com.br/sistema-rh-api/docs/`
 
+## PWA do Portal
+
+O portal do colaborador é instalável (manifest + service worker gerados no build do frontend). Em produção sob subcaminho, `scope`/`start_url` seguem o `VITE_BASE_PATH` (`/sistema-rh/colaborador/`); HTTPS já ativo (requisito de instalabilidade ok). A API nunca é cacheada pelo SW (`NetworkOnly`).
+
 ## Portas e rotas
 
 | Servico | Interno | Publico |

@@ -48,7 +48,8 @@ O frontend pode ocultar menus, mas a API deve bloquear a ação.
 O Portal do Colaborador (`/colaborador`) usa **nome + código de 6 dígitos** definidos pelo RH.
 
 - `GET /employee-portal/search` é pública com rate-limit e retorna `id`, `name` e `hasAccess`.
-- `POST /employee-portal/login` valida o código (bcrypt) com rate-limit estrito e emite token de escopo `employee-portal` válido por 8h.
+- `POST /employee-portal/login` valida o código (bcrypt) com rate-limit estrito e emite token de escopo `employee-portal`: 8h por padrão, 30d com `remember` ("manter conectado", guardado no aparelho). Escopo amarrado ao próprio funcionário; revogação pelo RH (`DELETE access-code`) ou limpando a sessão no aparelho.
+- `calendar` e `checkin` exigem o token do próprio funcionário (403 se o `employeeId` divergir).
 - `calendar` e `checkin` exigem o token do próprio funcionário (403 se o `employeeId` divergir).
 - Sem código ativado, o portal não abre ("procure o RH").
 - O código em texto puro é exibido ao RH **uma única vez** (geração individual ou lista de distribuição em lote); depois, só reemissão. O banco guarda só o hash.
