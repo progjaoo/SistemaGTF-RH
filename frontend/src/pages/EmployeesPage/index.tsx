@@ -236,7 +236,7 @@ export default function EmployeesPage({
             <span>Cria códigos para todos os ativos sem acesso. A lista aparece uma única vez.</span>
           </div>
         )}
-        {codeError && <p className="rounded-lg border border-danger/30 bg-danger/5 p-[10px_12px] font-extrabold text-danger">{codeError}</p>}
+        {codeError && <p className="rounded-lg border border-danger/30 bg-danger/5 p-[10px_12px] font-extrabold text-danger-ink">{codeError}</p>}
         <DataTable>
           <thead>
             <tr>

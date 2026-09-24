@@ -101,7 +101,7 @@ export function SpreadsheetImport({
       </div>
 
       {parseErrors.length > 0 && (
-        <ul className="grid list-disc gap-[6px] rounded-lg border border-danger/30 bg-danger/5 py-3 pl-8 pr-3 text-[0.88rem] font-bold text-danger">
+        <ul className="grid list-disc gap-[6px] rounded-lg border border-danger/30 bg-danger/5 py-3 pl-8 pr-3 text-[0.88rem] font-bold text-danger-ink">
           {parseErrors.map((item) => (
             <li key={item}>{item}</li>
           ))}
@@ -159,7 +159,7 @@ export function SpreadsheetImport({
         </DataTable>
       )}
       {preview.some((row) => row.status === "error") && (
-        <ul className="grid list-disc gap-[6px] rounded-lg border border-danger/30 bg-danger/5 py-3 pl-8 pr-3 text-[0.88rem] font-bold text-danger">
+        <ul className="grid list-disc gap-[6px] rounded-lg border border-danger/30 bg-danger/5 py-3 pl-8 pr-3 text-[0.88rem] font-bold text-danger-ink">
           {preview.filter((row) => row.status === "error").map((row) => (
             <li key={row.index}>Linha {row.index}: {row.message}</li>
           ))}

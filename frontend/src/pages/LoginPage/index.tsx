@@ -68,7 +68,7 @@ export default function LoginPage({ onLogin }: { onLogin: (email: string, passwo
               />
             </div>
 
-            {error && <div role="alert" className="rounded-[10px] border border-danger/30 bg-danger/5 px-[14px] py-3 text-[0.92rem] font-bold text-danger">{error}</div>}
+            {error && <div role="alert" className="rounded-[10px] border border-danger/30 bg-danger/5 px-[14px] py-3 text-[0.92rem] font-bold text-danger-ink">{error}</div>}
 
             <Button type="submit" variant="primary" size="lg" disabled={submitting} className="mt-2 w-full text-base">
               <ShieldCheck size={18} />
