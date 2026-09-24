@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import type { Role } from "@prisma/client";
+import { EmployeeStatus, type Role } from "@prisma/client";
 import { config } from "../config.js";
 import { prisma } from "../lib/prisma.js";
 
@@ -53,4 +53,45 @@ export function requireRole(...roles: Role[]) {
 
     return next();
   };
+}
+
+export type PortalEmployee = {
+  id: string;
+  name: string;
+};
+
+export type PortalRequest = Request & {
+  portalEmployee: PortalEmployee;
+};
+
+// Sessão do portal do colaborador (PLAN-001): token de escopo restrito,
+// válido por um turno (8h), vinculado a um funcionário ativo.
+export async function authenticatePortal(req: Request, res: Response, next: NextFunction) {
+  const header = req.header("authorization");
+  const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
+
+  if (!token) {
+    return res.status(401).json({ message: "Acesso do colaborador não autenticado." });
+  }
+
+  try {
+    const payload = jwt.verify(token, config.jwtSecret) as { sub: string; scope?: string };
+    if (payload.scope !== "employee-portal") {
+      return res.status(401).json({ message: "Sessão inválida para o portal do colaborador." });
+    }
+
+    const employee = await prisma.employee.findFirst({
+      where: { id: payload.sub, status: EmployeeStatus.ACTIVE },
+      select: { id: true, name: true }
+    });
+
+    if (!employee) {
+      return res.status(401).json({ message: "Cadastro inativo ou inexistente. Procure o RH." });
+    }
+
+    (req as PortalRequest).portalEmployee = { id: employee.id, name: employee.name };
+    return next();
+  } catch {
+    return res.status(401).json({ message: "Sessão do portal expirada. Entre de novo." });
+  }
 }

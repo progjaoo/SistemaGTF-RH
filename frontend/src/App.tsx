@@ -197,12 +197,17 @@ export default function App() {
               setNotice(result.warnings.length ? "Lançamentos salvos com alertas de jornada." : "Lançamentos salvos.");
               await refreshSelectedPeriod();
             }}
+            onImported={async () => {
+              await refreshSelectedPeriod();
+              setNotice("Planilha importada e lançamentos recarregados.");
+            }}
           />
         )}
         {activeTab === "employees" && (
           <EmployeesPage
             employees={employees}
             canEdit={isRh}
+            token={session.token}
             onSave={async (payload, id) => {
               await api.saveEmployee(session.token, payload, id);
               await loadWorkspace(session);
@@ -212,6 +217,9 @@ export default function App() {
               await api.inactivateEmployee(session.token, id);
               await loadWorkspace(session);
               setNotice("Funcionário inativado.");
+            }}
+            onReload={async () => {
+              await loadWorkspace(session);
             }}
           />
         )}
@@ -229,6 +237,7 @@ export default function App() {
         {activeTab === "periods" && isRh && (
           <PeriodsPage
             periods={periods}
+            token={session.token}
             onSave={async (payload) => {
               const response = await api.createPeriod(session.token, payload);
               setSelectedPeriodId(response.period.id);
@@ -249,6 +258,9 @@ export default function App() {
               setNotice("Período reaberto. Os lançamentos voltaram a ficar editáveis.");
             }}
             onExport={(period) => api.downloadReport(session.token, period)}
+            onReload={async () => {
+              await loadWorkspace(session);
+            }}
           />
         )}
         {activeTab === "users" && isRh && (

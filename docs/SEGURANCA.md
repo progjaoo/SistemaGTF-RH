@@ -43,18 +43,15 @@ requireRole(Role.RH)
 
 O frontend pode ocultar menus, mas a API deve bloquear a ação.
 
-## Rotas Públicas Controladas
+## Rotas do Portal do Colaborador
 
-O Portal do Colaborador expõe rotas públicas em `/employee-portal`.
+O Portal do Colaborador (`/colaborador`) usa **nome + código de 6 dígitos** definidos pelo RH.
 
-Decisão aceita para este MVP:
-
-- colaborador se identifica por nome;
-- a API retorna apenas `id` e `name`;
-- confirmação só altera `MealRecord` existente;
-- data futura e período fechado são bloqueados no backend.
-
-Risco: qualquer pessoa com acesso ao link e ao nome pode abrir/alterar a confirmação de um colaborador. Se esse risco deixar de ser aceitável, evoluir para matrícula/código individual antes de ampliar o uso.
+- `GET /employee-portal/search` é pública com rate-limit e retorna `id`, `name` e `hasAccess`.
+- `POST /employee-portal/login` valida o código (bcrypt) com rate-limit estrito e emite token de escopo `employee-portal` válido por 8h.
+- `calendar` e `checkin` exigem o token do próprio funcionário (403 se o `employeeId` divergir).
+- Sem código ativado, o portal não abre ("procure o RH").
+- O código em texto puro é exibido ao RH **uma única vez** (geração individual ou lista de distribuição em lote); depois, só reemissão. O banco guarda só o hash.
 
 ## CORS
 

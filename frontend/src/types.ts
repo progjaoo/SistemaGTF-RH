@@ -18,6 +18,10 @@ export type Employee = {
   name: string;
   status: EmployeeStatus;
   scheduleType: ScheduleType;
+  // Dias esperados (0=dom..6=sáb). Null = segue o scheduleType.
+  workdays: number[] | null;
+  // True = colaborador tem código de acesso ao portal (hash nunca trafega).
+  hasAccessCode: boolean;
   admissionDate: string | null;
   terminationDate: string | null;
 };
@@ -93,7 +97,10 @@ export type ApiWarning = {
   message: string;
 };
 
-export type EmployeePortalSearchResult = Pick<Employee, "id" | "name">;
+export type EmployeePortalSearchResult = Pick<Employee, "id" | "name"> & {
+  // False = sem código ativado (procure o RH). Nunca expõe hash.
+  hasAccess: boolean;
+};
 
 export type EmployeePortalDay = {
   id: string;
@@ -101,6 +108,8 @@ export type EmployeePortalDay = {
   quantity: number;
   confirmationStatus: ConfirmationStatus;
   confirmationSource: ConfirmationSource | null;
+  confirmationNote: string | null;
+  isLate: boolean;
   confirmedAt: string | null;
   period: Pick<BillingPeriod, "id" | "label" | "status">;
 };
@@ -112,10 +121,30 @@ export type MealRecordConfirmation = {
   quantity: number;
   confirmationStatus: ConfirmationStatus;
   confirmationSource: ConfirmationSource | null;
+  confirmationNote: string | null;
   confirmedAt: string | null;
 };
 
 export type MealConfirmationRealtimePayload = {
   periodId: string;
   confirmation: MealRecordConfirmation;
+};
+
+export type ImportPreviewRow = {
+  index: number;
+  name: string;
+  date: string;
+  quantity: number;
+  status: "ok" | "error";
+  message?: string;
+  employeeId?: string;
+  employeeName?: string;
+};
+
+export type ImportResult = {
+  records: MealRecord[];
+  warnings: ApiWarning[];
+  preview: ImportPreviewRow[];
+  valid: boolean;
+  invalidCount: number;
 };

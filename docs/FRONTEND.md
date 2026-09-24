@@ -89,11 +89,12 @@ Use essa pasta para regras visuais da grade, cards de funcionário, filtros e co
 
 Componentes específicos do portal público do colaborador:
 
-- busca por nome;
-- calendário mensal;
-- confirmação `Peguei` / `Não peguei`.
+- busca por nome (`NameSearch`);
+- etapa do código de 6 dígitos (`AccessCodeStep`);
+- calendário mensal com `react-day-picker` v9 + locale `date-fns/pt-BR` (`EmployeeCalendar`);
+- detalhe do dia com regras hoje/atrasado/confirmado (`DayCheckin`).
 
-Devem ser mobile-first, com botões grandes e sem dependência de sessão administrativa.
+Devem ser mobile-first, com botões grandes e sessão do portal em `sessionStorage` (token 8h — nunca `localStorage` permanente). A grade usa `modifiers` (`launched`, `confirmed`, `late`, `closed`), `disabled` para o futuro e `endMonth` para travar além do mês atual.
 
 ## Estilização
 

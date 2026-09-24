@@ -1,18 +1,39 @@
-import { ChevronLeft, ChevronRight, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { DayPicker, type DayButtonProps } from "react-day-picker";
+import "react-day-picker/style.css";
+import { ptBR } from "date-fns/locale";
 import styled from "styled-components";
 import type { ConfirmationStatus, EmployeePortalDay, EmployeePortalSearchResult } from "../../types";
 import { dateKeyInSaoPaulo } from "../../utils/date";
-import { EmptyState, IconButton } from "../ui";
+import { EmptyState } from "../ui";
 import { DayCheckin } from "./DayCheckin";
 
-function shiftMonth(month: string, delta: number) {
-  const [year, monthNumber] = month.split("-").map(Number);
-  const date = new Date(Date.UTC(year, monthNumber - 1 + delta, 1));
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+function parseKey(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
 }
 
-function monthLabel(month: string) {
-  return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(`${month}-01T00:00:00`));
+function toKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function dotClass(modifiers: Record<string, boolean>) {
+  if (modifiers.closed) return "dot dot-closed";
+  if (modifiers.confirmed) return "dot dot-confirmed";
+  if (modifiers.late) return "dot dot-late";
+  if (modifiers.launched) return "dot dot-pending";
+  return "dot";
+}
+
+function LaunchDayButton(props: DayButtonProps) {
+  const { day, modifiers, ...rest } = props;
+  return (
+    <button {...rest} type="button">
+      <span>{day.date.getDate()}</span>
+      {(modifiers.launched || modifiers.closed) && <span className={dotClass(modifiers)} aria-hidden="true" />}
+    </button>
+  );
 }
 
 export function EmployeeCalendar({
@@ -35,12 +56,36 @@ export function EmployeeCalendar({
   savingDate: string;
   error: string;
   onMonthChange: (month: string) => void;
-  onCheckin: (date: string, status: Exclude<ConfirmationStatus, "PENDING">) => void;
+  onCheckin: (date: string, status: Exclude<ConfirmationStatus, "PENDING">, note?: string) => void;
   onBack: () => void;
 }) {
-  const previousMonth = shiftMonth(month, -1);
-  const nextMonth = shiftMonth(month, 1);
   const today = dateKeyInSaoPaulo();
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedKey(null);
+  }, [month, employee.id]);
+
+  const byDate = useMemo(() => new Map(days.map((day) => [day.date, day])), [days]);
+
+  const modifiers = useMemo(() => {
+    const launched: Date[] = [];
+    const confirmed: Date[] = [];
+    const late: Date[] = [];
+    const closed: Date[] = [];
+    for (const day of days) {
+      const date = parseKey(day.date);
+      launched.push(date);
+      if (day.period.status === "CLOSED") closed.push(date);
+      else if (day.confirmationStatus !== "PENDING") confirmed.push(date);
+      else if (day.date < today) late.push(date);
+    }
+    return { launched, confirmed, late, closed };
+  }, [days, today]);
+
+  const selectedDay = selectedKey ? byDate.get(selectedKey) : undefined;
+  const monthDate = useMemo(() => parseKey(`${month}-01`), [month]);
+  const endMonth = useMemo(() => parseKey(`${currentMonth}-01`), [currentMonth]);
 
   return (
     <CalendarPanel>
@@ -55,34 +100,48 @@ export function EmployeeCalendar({
         <button type="button" onClick={onBack}>Trocar nome</button>
       </CalendarHeader>
 
-      <MonthNav>
-        <IconButton type="button" title="Mês anterior" onClick={() => onMonthChange(previousMonth)}>
-          <ChevronLeft size={18} />
-        </IconButton>
-        <strong>{monthLabel(month)}</strong>
-        <IconButton type="button" title="Próximo mês" onClick={() => onMonthChange(nextMonth)} disabled={nextMonth > currentMonth}>
-          <ChevronRight size={18} />
-        </IconButton>
-      </MonthNav>
-
       {error && <CalendarError>{error}</CalendarError>}
 
       {loading ? (
         <EmptyState>Carregando calendário...</EmptyState>
-      ) : days.length === 0 ? (
-        <EmptyState>Nenhum almoço lançado para este mês.</EmptyState>
       ) : (
-        <DaysGrid>
-          {days.map((day) => (
-            <DayCheckin
-              key={day.id}
-              day={day}
-              disabled={day.date > today || day.period.status === "CLOSED"}
-              saving={savingDate === day.date}
-              onCheckin={onCheckin}
+        <>
+          <MonthGrid>
+            <DayPicker
+              mode="single"
+              locale={ptBR}
+              month={monthDate}
+              onMonthChange={(next) => onMonthChange(toKey(next).slice(0, 7))}
+              endMonth={endMonth}
+              selected={selectedKey ? parseKey(selectedKey) : undefined}
+              onDayClick={(date, mods) => {
+                if (mods.disabled) return;
+                setSelectedKey(toKey(date));
+              }}
+              disabled={{ after: parseKey(today) }}
+              modifiers={modifiers}
+              modifiersClassNames={{
+                launched: "day-launched",
+                confirmed: "day-confirmed",
+                late: "day-late",
+                closed: "day-closed"
+              }}
+              components={{ DayButton: LaunchDayButton }}
             />
-          ))}
-        </DaysGrid>
+          </MonthGrid>
+          <Legend>
+            <span><i className="dot dot-pending" /> A confirmar</span>
+            <span><i className="dot dot-late" /> Atrasado</span>
+            <span><i className="dot dot-confirmed" /> Confirmado</span>
+            <span><i className="dot dot-closed" /> Período fechado</span>
+          </Legend>
+          <DayCheckin
+            day={selectedDay}
+            today={today}
+            saving={selectedDay ? savingDate === selectedDay.date : false}
+            onCheckin={onCheckin}
+          />
+        </>
       )}
     </CalendarPanel>
   );
@@ -97,6 +156,63 @@ const CalendarPanel = styled.section`
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
+
+  .rdp-root {
+    --rdp-accent-color: var(--teal);
+    --rdp-accent-background-color: var(--teal-soft);
+    --rdp-day-height: 44px;
+    --rdp-day-width: 44px;
+    margin: 0 auto;
+  }
+
+  .rdp-day_button {
+    position: relative;
+    min-height: 44px;
+    min-width: 44px;
+    border-radius: 8px;
+    font-weight: 800;
+
+    .dot {
+      position: absolute;
+      left: 50%;
+      bottom: 5px;
+      transform: translateX(-50%);
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+  }
+
+  .day-late .rdp-day_button {
+    border: 1px solid #f59e0b;
+  }
+
+  .day-closed .rdp-day_button {
+    color: var(--muted);
+  }
+
+  .dot-pending {
+    background: var(--amber, #f59e0b);
+  }
+
+  .dot-late {
+    background: #dc2626;
+  }
+
+  .dot-confirmed {
+    background: var(--teal);
+  }
+
+  .dot-closed {
+    background: #9ca3af;
+  }
+
+  .dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
 `;
 
 const CalendarHeader = styled.div`
@@ -144,27 +260,24 @@ const EmployeeTitle = styled.div`
   }
 `;
 
-const MonthNav = styled.div`
+const MonthGrid = styled.div`
   display: grid;
-  grid-template-columns: 40px 1fr 40px;
-  align-items: center;
-  gap: 10px;
-
-  strong {
-    text-align: center;
-    text-transform: capitalize;
-  }
-
-  ${IconButton} {
-    color: var(--ink);
-    border-color: var(--line);
-  }
+  justify-items: center;
 `;
 
-const DaysGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 10px;
+const Legend = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
 `;
 
 const CalendarError = styled.div`

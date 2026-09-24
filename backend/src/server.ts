@@ -20,6 +20,11 @@ import { initRealtime } from "./realtime.js";
 
 const app = express();
 
+// Atrás do Nginx (loopback), o IP real vem do X-Forwarded-For.
+// "loopback" confia apenas em 127.0.0.1/::1 — necessário para o
+// rate-limit e os logs de abuso enxergarem o IP verdadeiro.
+app.set("trust proxy", "loopback");
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -100,9 +105,16 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
 
 const httpServer = createServer(app);
 
-httpServer.listen(config.port, () => {
-  console.log(`Sistema RH API listening on http://localhost:${config.port}`);
-  void initRealtime(httpServer).catch((error) => {
-    console.error("Realtime indisponível:", error);
+// Exportado para testes (supertest) sem subir porta. O listen só acontece
+// em execução direta (`tsx src/server.ts` ou `node dist/src/server.js`).
+export { app };
+
+const isDirectRun = !!process.argv[1] && /(^|[\\/])server\.(ts|js)$/.test(process.argv[1]);
+if (isDirectRun) {
+  httpServer.listen(config.port, () => {
+    console.log(`Sistema RH API listening on http://localhost:${config.port}`);
+    void initRealtime(httpServer).catch((error) => {
+      console.error("Realtime indisponível:", error);
+    });
   });
-});
+}

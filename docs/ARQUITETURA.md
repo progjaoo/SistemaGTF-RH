@@ -75,10 +75,9 @@ Nginx
 - Mudança visual ou estrutural relevante deve atualizar `docs/FRONTEND.md`.
 - Mudança de produção deve atualizar `docs/DEPLOY-VPS.md`.
 
-## Próximos incrementos recomendados
+## Próximos incrementos (pendentes)
 
-- Configuração detalhada de jornada personalizada.
-- Importação assistida da planilha histórica.
-- Testes automatizados de cálculo de preço vigente.
-- Exportação PDF do relatório.
+- Configuração detalhada de jornada além de dias da semana (ex: escalas), se o RH pedir.
 - Separação de equipes por gestora, se o RH confirmar a necessidade.
+
+Entregue e verificado: jornada por dias da semana, importação assistida de planilha, testes automatizados (vitest, 60+ casos), exportação PDF, portal com código de acesso + calendário com regras, gerador anual de períodos.

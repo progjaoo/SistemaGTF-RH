@@ -1,11 +1,13 @@
 import { BillingStatus, Prisma } from "@prisma/client";
 import express from "express";
 import { z } from "zod";
-import { formatDate, isBetween, isExpectedWorkday, parseDate } from "../lib/dates.js";
+import { formatDate, isBetween, parseDate } from "../lib/dates.js";
+import { normalizeSearch } from "../lib/names.js";
 import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { authenticate, type AuthenticatedRequest } from "../middleware/auth.js";
-import { assertNoFutureDates } from "../services/date-rules.js";
+import { assertNoFutureDates, isFutureDate } from "../services/date-rules.js";
+import { applyMealEntry, type MealEntryWarning } from "../services/meal-entries.js";
 
 export const mealRecordsRouter = express.Router();
 
@@ -18,6 +20,7 @@ type ConfirmationRow = {
   quantity: number;
   confirmationStatus: "PENDING" | "PEGUEI" | "NAO_PEGUEI";
   confirmationSource: "SISTEMA" | "WHATSAPP" | null;
+  confirmationNote: string | null;
   confirmedAt: Date | null;
 };
 
@@ -86,6 +89,7 @@ mealRecordsRouter.get("/confirmations", asyncHandler(async (req, res) => {
       mr."quantity" AS "quantity",
       mr."confirmationStatus"::text AS "confirmationStatus",
       mr."confirmationSource"::text AS "confirmationSource",
+      mr."confirmationNote" AS "confirmationNote",
       mr."confirmedAt" AS "confirmedAt"
     FROM "MealRecord" mr
     INNER JOIN "Employee" e ON e."id" = mr."employeeId"
@@ -102,6 +106,7 @@ mealRecordsRouter.get("/confirmations", asyncHandler(async (req, res) => {
       quantity: record.quantity,
       confirmationStatus: record.confirmationStatus,
       confirmationSource: record.confirmationSource,
+      confirmationNote: record.confirmationNote,
       confirmedAt: record.confirmedAt?.toISOString() ?? null
     }))
     .sort((first, second) => {
@@ -136,7 +141,7 @@ mealRecordsRouter.post("/bulk", asyncHandler(async (req, res) => {
   });
   const employeeMap = new Map(employees.map((employee) => [employee.id, employee]));
 
-  const warnings: Array<{ employeeId: string; employeeName: string; date: string; message: string }> = [];
+  const warnings: MealEntryWarning[] = [];
   const records = [];
 
   for (const entry of parsedEntries) {
@@ -148,34 +153,16 @@ mealRecordsRouter.post("/bulk", asyncHandler(async (req, res) => {
       return res.status(422).json({ message: `Data ${entry.date} fora do período selecionado.` });
     }
 
-    if (entry.quantity > 0 && !isExpectedWorkday(date, employee.scheduleType)) {
-      warnings.push({
-        employeeId: employee.id,
-        employeeName: employee.name,
-        date: entry.date,
-        message: "Lançamento fora da jornada esperada."
-      });
-    }
-
-    if (entry.quantity === 0) {
-      await prisma.mealRecord.deleteMany({
-        where: { employeeId: employee.id, date }
-      });
-      continue;
-    }
-
-    const record = await prisma.mealRecord.upsert({
-      where: { employeeId_date: { employeeId: employee.id, date } },
-      update: { quantity: entry.quantity, registeredById: actor.id, periodId: period.id },
-      create: {
-        employeeId: employee.id,
-        periodId: period.id,
-        date,
-        quantity: entry.quantity,
-        registeredById: actor.id
-      }
+    const record = await applyMealEntry({
+      employee,
+      periodId: period.id,
+      actorId: actor.id,
+      date,
+      dateLabel: entry.date,
+      quantity: entry.quantity,
+      warnings
     });
-    records.push(record);
+    if (record) records.push(record);
   }
 
   await prisma.auditLog.create({
@@ -188,4 +175,136 @@ mealRecordsRouter.post("/bulk", asyncHandler(async (req, res) => {
   });
 
   res.json({ records: records.map(serializeRecord), warnings });
+}));
+
+const importRowSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  employeeId: z.string().optional(),
+  date: z.string(),
+  quantity: z.coerce.number().int().min(0).max(10)
+}).refine((row) => row.name || row.employeeId, {
+  message: "Informe name ou employeeId em cada linha."
+});
+
+const importSchema = z.object({
+  periodId: z.string(),
+  dryRun: z.boolean().optional().default(false),
+  rows: z.array(importRowSchema).min(1).max(2000)
+});
+
+type ImportPreviewRow = {
+  index: number;
+  name: string;
+  date: string;
+  quantity: number;
+  status: "ok" | "error";
+  message?: string;
+  employeeId?: string;
+  employeeName?: string;
+};
+
+// Importação assistida da planilha da gestora: valida linha a linha
+// (preview/dry-run) e só grava quando todas passam. Nunca cria período
+// nem funcionário — só lança em período OPEN existente.
+mealRecordsRouter.post("/import", asyncHandler(async (req, res) => {
+  const actor = (req as AuthenticatedRequest).user;
+  const input = importSchema.parse(req.body);
+
+  const period = await prisma.billingPeriod.findUnique({ where: { id: input.periodId } });
+  if (!period) return res.status(404).json({ message: "Período não encontrado." });
+  if (period.status === BillingStatus.CLOSED) {
+    return res.status(409).json({ message: "Períodos fechados não podem ser editados." });
+  }
+
+  const employees = await prisma.employee.findMany({ orderBy: [{ name: "asc" }] });
+  const byId = new Map(employees.map((employee) => [employee.id, employee]));
+
+  const preview: ImportPreviewRow[] = [];
+  const valid: Array<{ employeeId: string; date: Date; dateLabel: string; quantity: number }> = [];
+
+  input.rows.forEach((row, position) => {
+    const index = position + 1;
+    const base = { index, name: row.name ?? "", date: row.date, quantity: row.quantity };
+    const fail = (message: string): void => {
+      preview.push({ ...base, status: "error" as const, message });
+    };
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date)) {
+      fail("Data inválida. Use o formato YYYY-MM-DD.");
+      return;
+    }
+    const dateValue = parseDate(row.date);
+    if (isFutureDate(dateValue)) {
+      fail(`Data ${row.date} é futura.`);
+      return;
+    }
+    if (!isBetween(dateValue, period.startDate, period.endDate)) {
+      fail(`Data ${row.date} fora do período selecionado.`);
+      return;
+    }
+
+    if (row.employeeId) {
+      const employee = byId.get(row.employeeId);
+      if (!employee) {
+        fail("Funcionário não encontrado.");
+        return;
+      }
+      preview.push({ ...base, status: "ok", employeeId: employee.id, employeeName: employee.name });
+      valid.push({ employeeId: employee.id, date: dateValue, dateLabel: row.date, quantity: row.quantity });
+      return;
+    }
+
+    const query = normalizeSearch(row.name as string);
+    const exact = employees.filter((employee) => normalizeSearch(employee.name) === query);
+    const candidates = exact.length > 0
+      ? exact
+      : employees.filter((employee) => normalizeSearch(employee.name).includes(query));
+    if (candidates.length === 0) {
+      fail(`Funcionário não encontrado: ${row.name}.`);
+      return;
+    }
+    if (candidates.length > 1) {
+      fail(`Nome ambíguo: ${row.name} (${candidates.length} cadastros). Use o nome completo.`);
+      return;
+    }
+    const employee = candidates[0];
+    preview.push({ ...base, status: "ok", employeeId: employee.id, employeeName: employee.name });
+    valid.push({ employeeId: employee.id, date: dateValue, dateLabel: row.date, quantity: row.quantity });
+  });
+
+  const invalidCount = preview.filter((row) => row.status === "error").length;
+
+  if (input.dryRun || invalidCount > 0) {
+    return res
+      .status(!input.dryRun && invalidCount > 0 ? 422 : 200)
+      .json({ preview, valid: invalidCount === 0, invalidCount });
+  }
+
+  const warnings: MealEntryWarning[] = [];
+  const records = [];
+  for (const entry of valid) {
+    const employee = byId.get(entry.employeeId);
+    if (!employee) continue;
+    const record = await applyMealEntry({
+      employee,
+      periodId: period.id,
+      actorId: actor.id,
+      date: entry.date,
+      dateLabel: entry.dateLabel,
+      quantity: entry.quantity,
+      warnings
+    });
+    if (record) records.push(record);
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: actor.id,
+      entity: "MealRecord",
+      action: "IMPORT_PLANILHA",
+      metadata: { periodId: input.periodId, count: input.rows.length, warnings }
+    }
+  });
+
+  res.json({ records: records.map(serializeRecord), warnings, preview });
 }));

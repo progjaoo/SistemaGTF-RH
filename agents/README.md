@@ -49,6 +49,23 @@ Antes de executar uma tarefa, o agente deve consultar os documentos relevantes:
 - [docs/AUTOMACOES.md](../docs/AUTOMACOES.md)
 - [docs/CONTRIBUICAO.md](../docs/CONTRIBUICAO.md)
 
+## Versões Pinadas e Fontes Técnicas (Context7, set/2026)
+
+Os agentes embutem orientação versionada das libs abaixo. Não sugerir upgrade sem plano próprio.
+
+| Lib | Versão no repo | Fonte Context7 |
+|---|---|---|
+| React + ReactDOM | 18.3.1 | `/reactjs/react.dev` (hooks, effects, memo) |
+| Vite | 6.4.3 | `/websites/vite_dev` (env `VITE_*`, build) |
+| styled-components | 6.1.19 | `/websites/styled-components` (transient props `$`, TS) |
+| Express | 4.21.2 | padrões Express 4 do repo |
+| Zod | 3.25.67 | `/colinhacks/zod` — **atenção: docs atuais cobrem v4; aqui vale v3** (`errorMap`, `.flatten()`) |
+| Prisma | 6.10.1 | `/websites/prisma_io` (`migrate deploy`, `resolve`, `diff`) |
+| jsonwebtoken | 9.0.2 | `/auth0/node-jsonwebtoken` (`sign`/`verify`, `expiresIn`, `TokenExpiredError`) |
+| bcryptjs | 3.0.2 | `hash`/`compare`, cost 10 |
+| Socket.IO | 4.8.3 | `/websites/socket_io_v4` (rooms, `use()`, `connect_error`) |
+| react-day-picker | a travar no PLAN-001 | `/gpbl/react-day-picker` (v10 usa `@daypicker/react`; v9 usa `react-day-picker` + `date-fns/locale`) |
+
 ## Protocolo Geral
 
 Todo agente deve:

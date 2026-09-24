@@ -5,6 +5,7 @@ import { z } from "zod";
 import { config } from "../config.js";
 import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
+import { loginLimiter } from "../middleware/rate-limit.js";
 import { authenticate, type AuthenticatedRequest } from "../middleware/auth.js";
 
 export const authRouter = express.Router();
@@ -14,7 +15,7 @@ const loginSchema = z.object({
   password: z.string().min(1)
 });
 
-authRouter.post("/login", asyncHandler(async (req, res) => {
+authRouter.post("/login", loginLimiter, asyncHandler(async (req, res) => {
   const input = loginSchema.parse(req.body);
   const user = await prisma.user.findUnique({ where: { email: input.email } });
 

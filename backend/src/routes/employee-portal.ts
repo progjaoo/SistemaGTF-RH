@@ -1,13 +1,24 @@
 import { BillingStatus, EmployeeStatus, Prisma } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import express from "express";
+import jwt from "jsonwebtoken";
 import { z } from "zod";
+import { config } from "../config.js";
 import { formatDate, parseDate } from "../lib/dates.js";
+import { normalizeSearch } from "../lib/names.js";
 import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
+import { authenticatePortal, type PortalRequest } from "../middleware/auth.js";
+import { portalLoginLimiter } from "../middleware/rate-limit.js";
+import { portalLimiter } from "../middleware/rate-limit.js";
 import { emitMealConfirmationUpdated } from "../realtime.js";
 import { formatDateKeyInSaoPaulo, isFutureDate } from "../services/date-rules.js";
 
 export const employeePortalRouter = express.Router();
+
+// Anti-robô no portal público (60 req/min por IP). Tentativas além do
+// limite retornam 429 e são auditadas como PORTAL_RATE_LIMITED.
+employeePortalRouter.use(portalLimiter);
 
 type PortalDayRow = {
   id: string;
@@ -15,6 +26,7 @@ type PortalDayRow = {
   quantity: number;
   confirmationStatus: "PENDING" | "PEGUEI" | "NAO_PEGUEI";
   confirmationSource: "SISTEMA" | "WHATSAPP" | null;
+  confirmationNote: string | null;
   confirmedAt: Date | null;
   periodId: string;
   periodLabel: string;
@@ -31,17 +43,15 @@ const calendarSchema = z.object({
 
 const checkinSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato YYYY-MM-DD."),
-  status: z.enum(["PEGUEI", "NAO_PEGUEI"])
+  status: z.enum(["PEGUEI", "NAO_PEGUEI"]),
+  // Observação sempre aceita (≤500); obrigatória em marcação atrasada.
+  note: z.string().trim().max(500).optional()
 });
 
-function normalizeSearch(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toUpperCase();
-}
+const portalLoginSchema = z.object({
+  employeeId: z.string(),
+  code: z.string().regex(/^\d{6}$/, "Código com 6 dígitos.")
+});
 
 function monthBounds(month: string) {
   const [year, monthNumber] = month.split("-").map(Number);
@@ -56,18 +66,88 @@ employeePortalRouter.get("/search", asyncHandler(async (req, res) => {
   const query = normalizeSearch(input.name);
   const employees = await prisma.employee.findMany({
     where: { status: EmployeeStatus.ACTIVE },
-    select: { id: true, name: true },
+    select: { id: true, name: true, accessCodeHash: true },
     orderBy: [{ name: "asc" }]
   });
 
   const matches = employees
     .filter((employee) => normalizeSearch(employee.name).includes(query))
-    .slice(0, 20);
+    .slice(0, 20)
+    .map((employee) => ({
+      id: employee.id,
+      name: employee.name,
+      hasAccess: employee.accessCodeHash !== null
+    }));
+
+  await prisma.auditLog.create({
+    data: {
+      entity: "Employee",
+      action: "PORTAL_SEARCH",
+      metadata: {
+        query: input.name,
+        matches: matches.length,
+        ip: req.ip ?? null,
+        userAgent: req.get("user-agent") ?? null
+      }
+    }
+  });
 
   res.json({ employees: matches });
 }));
 
-employeePortalRouter.get("/:employeeId/calendar", asyncHandler(async (req, res) => {
+// Login do colaborador: nome (via search) + código de 6 dígitos definidos
+// pelo RH. Emite token de escopo "employee-portal" válido por um turno (8h).
+employeePortalRouter.post("/login", portalLoginLimiter, asyncHandler(async (req, res) => {
+  const input = portalLoginSchema.parse(req.body);
+  const employee = await prisma.employee.findFirst({
+    where: { id: input.employeeId, status: EmployeeStatus.ACTIVE }
+  });
+
+  if (!employee || !employee.accessCodeHash) {
+    await prisma.auditLog.create({
+      data: {
+        entity: "Employee",
+        entityId: input.employeeId,
+        action: "PORTAL_LOGIN_FAILED",
+        metadata: { reason: "no-access", ip: req.ip ?? null }
+      }
+    });
+    return res.status(401).json({ message: "Sem acesso ativado. Procure o RH." });
+  }
+
+  const codeMatches = await bcrypt.compare(input.code, employee.accessCodeHash);
+  if (!codeMatches) {
+    await prisma.auditLog.create({
+      data: {
+        entity: "Employee",
+        entityId: employee.id,
+        action: "PORTAL_LOGIN_FAILED",
+        metadata: { reason: "wrong-code", ip: req.ip ?? null }
+      }
+    });
+    return res.status(401).json({ message: "Código inválido." });
+  }
+
+  const token = jwt.sign({ sub: employee.id, scope: "employee-portal" }, config.jwtSecret, { expiresIn: "8h" });
+
+  await prisma.auditLog.create({
+    data: {
+      entity: "Employee",
+      entityId: employee.id,
+      action: "PORTAL_LOGIN",
+      metadata: { ip: req.ip ?? null, userAgent: req.get("user-agent") ?? null }
+    }
+  });
+
+  res.json({ token, employee: { id: employee.id, name: employee.name } });
+}));
+
+employeePortalRouter.get("/:employeeId/calendar", authenticatePortal, asyncHandler(async (req, res) => {
+  const portalEmployee = (req as PortalRequest).portalEmployee;
+  if (portalEmployee.id !== req.params.employeeId) {
+    return res.status(403).json({ message: "Sessão de outro colaborador." });
+  }
+
   const input = calendarSchema.parse(req.query);
   const month = input.month ?? formatDateKeyInSaoPaulo().slice(0, 7);
   const { startDate, endDate } = monthBounds(month);
@@ -86,6 +166,7 @@ employeePortalRouter.get("/:employeeId/calendar", asyncHandler(async (req, res) 
       mr."quantity" AS "quantity",
       mr."confirmationStatus"::text AS "confirmationStatus",
       mr."confirmationSource"::text AS "confirmationSource",
+      mr."confirmationNote" AS "confirmationNote",
       mr."confirmedAt" AS "confirmedAt",
       bp."id" AS "periodId",
       bp."label" AS "periodLabel",
@@ -99,26 +180,38 @@ employeePortalRouter.get("/:employeeId/calendar", asyncHandler(async (req, res) 
     ORDER BY mr."date" ASC
   `);
 
+  const todayKey = formatDateKeyInSaoPaulo();
+
   res.json({
     employee,
     month,
-    days: records.map((record) => ({
-      id: record.id,
-      date: formatDate(record.date),
-      quantity: record.quantity,
-      confirmationStatus: record.confirmationStatus,
-      confirmationSource: record.confirmationSource,
-      confirmedAt: record.confirmedAt?.toISOString() ?? null,
-      period: {
-        id: record.periodId,
-        label: record.periodLabel,
-        status: record.periodStatus
-      }
-    }))
+    days: records.map((record) => {
+      const dateKey = formatDate(record.date);
+      return {
+        id: record.id,
+        date: dateKey,
+        quantity: record.quantity,
+        confirmationStatus: record.confirmationStatus,
+        confirmationSource: record.confirmationSource,
+        confirmationNote: record.confirmationNote,
+        isLate: dateKey < todayKey,
+        confirmedAt: record.confirmedAt?.toISOString() ?? null,
+        period: {
+          id: record.periodId,
+          label: record.periodLabel,
+          status: record.periodStatus
+        }
+      };
+    })
   });
 }));
 
-employeePortalRouter.post("/:employeeId/checkin", asyncHandler(async (req, res) => {
+employeePortalRouter.post("/:employeeId/checkin", authenticatePortal, asyncHandler(async (req, res) => {
+  const portalEmployee = (req as PortalRequest).portalEmployee;
+  if (portalEmployee.id !== req.params.employeeId) {
+    return res.status(403).json({ message: "Sessão de outro colaborador." });
+  }
+
   const input = checkinSchema.parse(req.body);
   const date = parseDate(input.date);
 
@@ -146,11 +239,24 @@ employeePortalRouter.post("/:employeeId/checkin", asyncHandler(async (req, res) 
     return res.status(422).json({ message: "Períodos fechados não aceitam confirmação de almoço." });
   }
 
+  // Confirmação é ato único: para alterar, o colaborador fala pessoalmente
+  // com RH/gestora (decisão travada PLAN-001 §9).
+  if (record.confirmationStatus !== "PENDING") {
+    return res.status(409).json({ message: "Confirmação já registrada. Para alterar, fale pessoalmente com o RH." });
+  }
+
+  const isLate = formatDate(date) < formatDateKeyInSaoPaulo();
+  const note = input.note?.trim() ? input.note.trim() : null;
+  if (isLate && !note) {
+    return res.status(422).json({ message: "Justificativa obrigatória para marcação atrasada." });
+  }
+
   await prisma.$executeRaw`
     UPDATE "MealRecord"
     SET
       "confirmationStatus" = ${input.status}::"ConfirmationStatus",
       "confirmationSource" = 'SISTEMA'::"ConfirmationSource",
+      "confirmationNote" = ${note},
       "confirmedAt" = NOW(),
       "updatedAt" = NOW()
     WHERE "id" = ${record.id}::uuid
@@ -163,6 +269,7 @@ employeePortalRouter.post("/:employeeId/checkin", asyncHandler(async (req, res) 
       mr."quantity" AS "quantity",
       mr."confirmationStatus"::text AS "confirmationStatus",
       mr."confirmationSource"::text AS "confirmationSource",
+      mr."confirmationNote" AS "confirmationNote",
       mr."confirmedAt" AS "confirmedAt",
       bp."id" AS "periodId",
       bp."label" AS "periodLabel",
@@ -184,6 +291,8 @@ employeePortalRouter.post("/:employeeId/checkin", asyncHandler(async (req, res) 
         date: input.date,
         status: input.status,
         source: "SISTEMA",
+        isLate,
+        note,
         ip: req.ip,
         userAgent: req.get("user-agent") ?? null
       } satisfies Prisma.JsonObject
@@ -197,6 +306,8 @@ employeePortalRouter.post("/:employeeId/checkin", asyncHandler(async (req, res) 
     quantity: updated.quantity,
     confirmationStatus: updated.confirmationStatus,
     confirmationSource: updated.confirmationSource,
+    confirmationNote: updated.confirmationNote,
+    isLate,
     confirmedAt: updated.confirmedAt?.toISOString() ?? null,
     period: {
       id: updated.periodId,
@@ -214,6 +325,7 @@ employeePortalRouter.post("/:employeeId/checkin", asyncHandler(async (req, res) 
       quantity: updated.quantity,
       confirmationStatus: updated.confirmationStatus,
       confirmationSource: updated.confirmationSource,
+      confirmationNote: updated.confirmationNote,
       confirmedAt: recordPayload.confirmedAt
     }
   });

@@ -32,6 +32,13 @@ model Employee {
   name            String
   status          EmployeeStatus @default(ACTIVE)
   scheduleType    ScheduleType   @default(MON_FRI)
+  // Dias da semana esperados (0=dom..6=sáb, CSV ex: "1,2,3,4,5,6").
+  // Null = segue o scheduleType. Usado só quando faz sentido (CUSTOM).
+  workdays        String?        @db.VarChar(13)
+  // Acesso ao portal do colaborador (PLAN-001): hash bcrypt do código de
+  // 6 dígitos. Null = sem acesso (procure o RH). Nunca expor na API.
+  accessCodeHash      String?
+  accessCodeUpdatedAt DateTime?
   admissionDate   DateTime?      @db.Date
   terminationDate DateTime?      @db.Date
   createdAt       DateTime       @default(now())
@@ -90,6 +97,9 @@ model MealRecord {
   confirmationStatus ConfirmationStatus  @default(PENDING)
   confirmationSource ConfirmationSource?
   confirmedAt        DateTime?
+  // Justificativa/observação do colaborador (obrigatória em marcação
+  // atrasada, opcional no dia). Exibida à gestora na conferência.
+  confirmationNote   String?             @db.VarChar(500)
   registeredById     String              @db.Uuid
   registeredBy       User                @relation("RegisteredBy", fields: [registeredById], references: [id])
   createdAt          DateTime            @default(now())

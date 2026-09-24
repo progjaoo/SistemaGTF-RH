@@ -46,10 +46,15 @@ Campos relevantes:
 - `name`
 - `status`
 - `scheduleType`
+- `workdays`
 - `admissionDate`
 - `terminationDate`
 
 Funcionário deve ser inativado, não apagado, para preservar histórico.
+
+`workdays` guarda os dias esperados como CSV (`0`=dom .. `6`=sáb, ex: `"1,2,3,4,5,6"` para seg–sáb). `null` = segue o `scheduleType`. A API expõe como array (`[1,2,3,4,5,6]`) e aceita o array em `POST`/`PUT` (1–7 valores de 0–6; `null` limpa). O aviso de jornada no bulk usa os dias explícitos quando presentes — sem bloquear.
+
+`accessCodeHash` guarda o bcrypt do código de 6 dígitos do portal; `null` = sem acesso. `accessCodeUpdatedAt` registra a última emissão. A API **nunca** expõe o hash — só `hasAccessCode` (admin) e `hasAccess` (busca do portal).
 
 ### `MealPrice`
 
@@ -169,11 +174,19 @@ Seeds devem ser idempotentes sempre que possível.
 
 Produção usa container `sistema-rh-postgres`.
 
-Backup:
+Backup manual:
 
 ```bash
 docker exec -t sistema-rh-postgres pg_dump -U sistema_rh -d sistema_rh > sistema_rh_backup.sql
 ```
+
+Backup automático com retenção (últimos 7, via cron diário `0 3 * * *`):
+
+```bash
+/var/www/sistema-rh/scripts/backup-sistema-rh.sh
+```
+
+Variáveis do script (com defaults de produção): `BACKUP_CONTAINER`, `BACKUP_USER`, `BACKUP_DB`, `BACKUP_DIR`, `BACKUP_KEEP`. Contra o aglomerado local: `BACKUP_CONTAINER=sistema-rh-pg-test BACKUP_USER=postgres BACKUP_DIR=./backups ./scripts/backup-sistema-rh.sh`.
 
 Restauração:
 

@@ -60,6 +60,8 @@ Não deve acessar ações administrativas de RH.
 - Período fechado não aceita edição de lançamentos.
 - Preços são calculados por vigência.
 - Usuário `GESTORA` não deve executar ações exclusivas de `RH`.
+- Portal do colaborador exige nome + código de 6 dígitos; confirmação é ato único (sem troca pelo portal).
+- Períodos podem ser mensais, anuais ou gerados em lote (ano → 12 mensais, corte 06).
 - A API é a fonte final de validação de permissões.
 
 ## Módulos

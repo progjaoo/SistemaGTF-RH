@@ -14,6 +14,7 @@ import {
   Save,
   Search,
   Soup,
+  Upload,
   X
 } from "lucide-react";
 import {
@@ -45,6 +46,7 @@ import {
 } from "../../components/records/styles";
 import { api } from "../../api";
 import { Badge, Button, DataTable, EmptyState, Panel, PanelHeader } from "../../components/ui";
+import { SpreadsheetImport } from "../../components/records/SpreadsheetImport";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useMealConfirmationRealtime } from "../../hooks/useMealConfirmationRealtime";
 import type { ApiWarning, BillingPeriod, Employee, MealConfirmationRealtimePayload, MealPrice, MealRecordConfirmation } from "../../types";
@@ -61,7 +63,8 @@ export default function RecordsPage({
   quantities,
   warnings,
   onChangeQuantity,
-  onSave
+  onSave,
+  onImported
 }: {
   token: string;
   employees: Employee[];
@@ -71,6 +74,7 @@ export default function RecordsPage({
   warnings: ApiWarning[];
   onChangeQuantity: (key: string, value: number) => void;
   onSave: () => Promise<void>;
+  onImported: () => Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
   const [loadingConfirmations, setLoadingConfirmations] = useState(false);
@@ -79,6 +83,7 @@ export default function RecordsPage({
   const [confirmations, setConfirmations] = useState<MealRecordConfirmation[]>([]);
   const [selectedDate, setSelectedDate] = useState(period.startDate);
   const [employeeSearch, setEmployeeSearch] = useState("");
+  const [showImport, setShowImport] = useState(false);
   const debouncedSearch = useDebouncedValue(employeeSearch);
   const dates = useMemo(() => dateRange(period.startDate, period.endDate), [period.startDate, period.endDate]);
   const activeEmployees = useMemo(() => employees.filter((employee) => employee.status === "ACTIVE"), [employees]);
@@ -274,12 +279,20 @@ export default function RecordsPage({
             <FileText size={17} />
             Gerar PDF
           </Button>
+          <Button type="button" $variant="ghost" onClick={() => setShowImport((current) => !current)} disabled={readOnly}>
+            <Upload size={17} />
+            Importar planilha
+          </Button>
           <Button type="button" $variant="ghost" onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
             <ClipboardCheck size={17} />
             Verificar quem Pegou
           </Button>
         </BulkActions>
       </RecordsTools>
+
+      {showImport && !readOnly && (
+        <SpreadsheetImport token={token} periodId={period.id} readOnly={readOnly} onImported={onImported} />
+      )}
 
       {confirmationScope && (
         <Panel>
@@ -318,6 +331,7 @@ export default function RecordsPage({
                   <th>Qtd.</th>
                   <th>Status</th>
                   <th>Origem</th>
+                  <th>Observação</th>
                 </tr>
               </thead>
               <tbody>
@@ -332,6 +346,7 @@ export default function RecordsPage({
                       </Badge>
                     </td>
                     <td>{confirmation.confirmationSource === "SISTEMA" ? "Sistema" : confirmation.confirmationSource === "WHATSAPP" ? "WhatsApp" : "Sem confirmação"}</td>
+                    <td>{confirmation.confirmationNote ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

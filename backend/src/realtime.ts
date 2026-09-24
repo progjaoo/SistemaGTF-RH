@@ -17,6 +17,7 @@ export type MealConfirmationPayload = {
     quantity: number;
     confirmationStatus: "PENDING" | "PEGUEI" | "NAO_PEGUEI";
     confirmationSource: "SISTEMA" | "WHATSAPP" | null;
+    confirmationNote: string | null;
     confirmedAt: string | null;
   };
 };

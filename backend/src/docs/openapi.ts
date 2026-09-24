@@ -80,6 +80,8 @@ export const openApiDocument = {
           name: { type: "string", example: "Maria Eduarda" },
           status: { type: "string", enum: ["ACTIVE", "INACTIVE"] },
           scheduleType: { type: "string", enum: ["MON_FRI", "MON_SUN", "CUSTOM"] },
+          workdays: { type: "array", items: { type: "integer", minimum: 0, maximum: 6 }, nullable: true, example: [1, 2, 3, 4, 5, 6], description: "Dias esperados (0=dom..6=sáb). Null segue o scheduleType." },
+          hasAccessCode: { type: "boolean", description: "True = código de acesso ativo (hash nunca trafega)" },
           admissionDate: { type: "string", format: "date", nullable: true },
           terminationDate: { type: "string", format: "date", nullable: true }
         }
@@ -91,6 +93,7 @@ export const openApiDocument = {
           name: { type: "string", example: "Maria Eduarda" },
           status: { type: "string", enum: ["ACTIVE", "INACTIVE"], default: "ACTIVE" },
           scheduleType: { type: "string", enum: ["MON_FRI", "MON_SUN", "CUSTOM"], example: "MON_FRI" },
+          workdays: { type: "array", items: { type: "integer", minimum: 0, maximum: 6 }, nullable: true, example: [1, 2, 3, 4, 5, 6] },
           admissionDate: { type: "string", format: "date", nullable: true },
           terminationDate: { type: "string", format: "date", nullable: true }
         }
@@ -184,7 +187,8 @@ export const openApiDocument = {
         type: "object",
         properties: {
           id: { type: "string", format: "uuid" },
-          name: { type: "string", example: "Maria Eduarda" }
+          name: { type: "string", example: "Maria Eduarda" },
+          hasAccess: { type: "boolean", description: "False = sem código ativado (procure o RH)" }
         }
       },
       EmployeePortalDay: {
@@ -211,7 +215,8 @@ export const openApiDocument = {
         required: ["date", "status"],
         properties: {
           date: { type: "string", format: "date", example: "2026-07-03" },
-          status: { type: "string", enum: ["PEGUEI", "NAO_PEGUEI"] }
+          status: { type: "string", enum: ["PEGUEI", "NAO_PEGUEI"] },
+          note: { type: "string", maxLength: 500, description: "Obrigatória em marcação atrasada" }
         }
       }
     },
@@ -343,6 +348,32 @@ export const openApiDocument = {
         responses: { "200": { description: "Funcionário inativado" } }
       }
     },
+    "/employees/{id}/access-code": {
+      put: {
+        tags: ["Employees"],
+        summary: "Define/reemite código de acesso do portal (RH)",
+        description: "Sem corpo, o sistema gera 6 dígitos. O código em texto puro é retornado UMA única vez.",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: { "200": { description: "Código emitido" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { description: "Funcionário não encontrado" } }
+      },
+      delete: {
+        tags: ["Employees"],
+        summary: "Revoga código de acesso do portal (RH)",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: { "200": { description: "Acesso revogado" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { description: "Funcionário não encontrado" } }
+      }
+    },
+    "/employees/access-codes/batch": {
+      post: {
+        tags: ["Employees"],
+        summary: "Gera códigos para ativos sem acesso (RH)",
+        description: "Lista com os códigos retornada UMA única vez para distribuição. Segunda chamada retorna count 0.",
+        security: [{ bearerAuth: [] }],
+        responses: { "200": { description: "Códigos emitidos" }, "403": { $ref: "#/components/responses/Forbidden" } }
+      }
+    },
     "/meal-prices": {
       get: {
         tags: ["Meal Prices"],
@@ -387,6 +418,19 @@ export const openApiDocument = {
         }
       }
     },
+    "/meal-records/import": {
+      post: {
+        tags: ["Meal Records"],
+        summary: "Importa planilha da gestora com preview",
+        description: "Com dryRun=true retorna o preview linha a linha sem gravar. Sem dryRun, qualquer linha inválida bloqueia tudo com 422 e nada é gravado. Nunca cria período nem funcionário.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": { description: "Preview (dryRun) ou lançamentos importados" },
+          "409": { description: "Período fechado" },
+          "422": { description: "Linha inválida no commit (nome, data ou quantidade)" }
+        }
+      }
+    },
     "/meal-records/confirmations": {
       get: {
         tags: ["Meal Records"],
@@ -418,11 +462,38 @@ export const openApiDocument = {
         }
       }
     },
+    "/employee-portal/login": {
+      post: {
+        tags: ["Employee Portal"],
+        summary: "Login do colaborador (nome + código de 6 dígitos)",
+        description: "Rota pública com rate-limit estrito (10/min por IP). Emite token de escopo employee-portal válido por 8h.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["employeeId", "code"],
+                properties: {
+                  employeeId: { type: "string", format: "uuid" },
+                  code: { type: "string", pattern: "^\\d{6}$", example: "482917" }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": { description: "Token do portal + funcionário" },
+          "401": { description: "Sem acesso ativado ou código inválido" },
+          "429": { description: "Muitas tentativas" }
+        }
+      }
+    },
     "/employee-portal/search": {
       get: {
         tags: ["Employee Portal"],
         summary: "Busca pública de funcionários ativos por nome",
-        description: "Rota pública sem JWT. Retorna apenas id e nome para o autoatendimento do colaborador.",
+        description: "Rota pública sem JWT, com rate-limit (60/min por IP). Retorna id, nome e hasAccess para o autoatendimento do colaborador.",
         parameters: [{ name: "name", in: "query", required: true, schema: { type: "string", minLength: 2 } }],
         responses: {
           "200": {
@@ -448,8 +519,9 @@ export const openApiDocument = {
     "/employee-portal/{employeeId}/calendar": {
       get: {
         tags: ["Employee Portal"],
-        summary: "Retorna calendário público de almoços do colaborador",
-        description: "Rota pública sem JWT. Mostra apenas dias com lançamento de almoço existente.",
+        summary: "Retorna calendário de almoços do colaborador",
+        description: "Exige token do portal (POST /employee-portal/login) do próprio funcionário. Mostra apenas dias com lançamento existente.",
+        security: [{ bearerAuth: [] }],
         parameters: [
           { name: "employeeId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
           { name: "month", in: "query", required: false, schema: { type: "string", pattern: "^\\d{4}-\\d{2}$", example: "2026-07" } }
@@ -482,7 +554,8 @@ export const openApiDocument = {
       post: {
         tags: ["Employee Portal"],
         summary: "Confirma se o colaborador pegou almoço",
-        description: "Rota pública sem JWT. Bloqueia data futura e período fechado. A referência de hoje é o relógio da VPS no fuso America/Sao_Paulo.",
+        description: "Exige token do portal do próprio funcionário. Bloqueia data futura e período fechado. A referência de hoje é o relógio da VPS no fuso America/Sao_Paulo.",
+        security: [{ bearerAuth: [] }],
         parameters: [{ name: "employeeId", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         requestBody: {
           required: true,
@@ -534,6 +607,20 @@ export const openApiDocument = {
         responses: { "200": { description: "Período fechado" }, "409": { description: "Período já fechado" } }
       }
     },
+    "/billing-periods/bulk-year": {
+      post: {
+        tags: ["Billing Periods"],
+        summary: "Gera os 12 mensais de um ano (RH)",
+        description: "Atômico: sobreposição com período existente retorna 409 com conflicts e nada é criado. cutDay 1–28.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "201": { description: "12 períodos criados" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "409": { description: "Conflito com períodos existentes" },
+          "422": { $ref: "#/components/responses/ValidationError" }
+        }
+      }
+    },
     "/billing-periods/{id}/reopen": {
       post: {
         tags: ["Billing Periods"],
@@ -550,11 +637,11 @@ export const openApiDocument = {
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
-          { name: "format", in: "query", schema: { type: "string", enum: ["xlsx"] } }
+          { name: "format", in: "query", schema: { type: "string", enum: ["xlsx", "pdf"] } }
         ],
         responses: {
           "200": {
-            description: "Relatório em JSON ou arquivo XLSX"
+            description: "Relatório em JSON ou arquivo XLSX/PDF"
           }
         }
       }
