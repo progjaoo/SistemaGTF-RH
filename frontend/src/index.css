@@ -49,3 +49,50 @@ textarea:focus-visible,
     transition-duration: 0.001ms !important;
   }
 }
+
+/* react-day-picker no portal do colaborador (tokens Genesis) */
+.portal-calendar .rdp-root {
+  --rdp-accent-color: var(--color-teal);
+  --rdp-accent-background-color: var(--color-teal-bg);
+  --rdp-day-height: 44px;
+  --rdp-day-width: 44px;
+  margin: 0 auto;
+}
+
+.portal-calendar .rdp-day_button {
+  position: relative;
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.portal-calendar .rdp-day_button .dot {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  transform: translateX(-50%);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.portal-calendar .day-late .rdp-day_button {
+  border: 1px solid #f59e0b;
+}
+
+.portal-calendar .day-closed .rdp-day_button {
+  color: var(--color-muted);
+}
+
+.portal-calendar .dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.portal-calendar .dot-pending { background: #f59e0b; }
+.portal-calendar .dot-late { background: #dc2626; }
+.portal-calendar .dot-confirmed { background: var(--color-teal); }
+.portal-calendar .dot-closed { background: #9ca3af; }

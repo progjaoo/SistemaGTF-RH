@@ -1,8 +1,7 @@
 import { KeyRound } from "lucide-react";
-import styled from "styled-components";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import type { EmployeePortalSearchResult } from "../../types";
-import { Button, Field, InlineError } from "../ui";
 
 export function AccessCodeStep({
   employee,
@@ -20,21 +19,22 @@ export function AccessCodeStep({
   const [code, setCode] = useState("");
 
   return (
-    <CodePanel>
+    <section className="grid w-[min(520px,100%)] gap-[18px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_48px_rgb(32_38_44/0.08)]">
       <div>
-        <h1>Olá, {employee.name}</h1>
-        <p>Digite seu código de acesso de 6 dígitos (entregue pelo RH).</p>
+        <h1 className="m-0 text-[clamp(1.5rem,6vw,2.1rem)]">Olá, {employee.name}</h1>
+        <p className="mt-2 text-muted">Digite seu código de acesso de 6 dígitos (entregue pelo RH).</p>
       </div>
 
-      <CodeForm
+      <form
+        className="grid gap-3"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit(code);
         }}
       >
-        <Field>
-          <label htmlFor="access-code">Código de acesso</label>
-          <CodeInput
+        <div className="grid gap-[6px]">
+          <label htmlFor="access-code" className="text-[0.82rem] font-bold text-muted">Código de acesso</label>
+          <input
             id="access-code"
             value={code}
             onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
@@ -44,67 +44,23 @@ export function AccessCodeStep({
             required
             minLength={6}
             maxLength={6}
+            className="min-h-[44px] rounded-lg border border-line bg-white px-[10px] py-2 text-center text-[1.6rem] tracking-[0.5em] text-ink focus:border-teal focus:outline-none"
           />
-        </Field>
+        </div>
         <Button type="submit" disabled={loading || code.length !== 6}>
           <KeyRound size={17} />
           {loading ? "Verificando..." : "Entrar"}
         </Button>
-        <GhostButton type="button" onClick={onBack}>
+        <button
+          type="button"
+          onClick={onBack}
+          className="min-h-11 rounded-lg border border-line bg-white font-extrabold text-teal-deep"
+        >
           Trocar nome
-        </GhostButton>
-      </CodeForm>
+        </button>
+      </form>
 
-      {error && <PortalError>{error}</PortalError>}
-    </CodePanel>
+      {error && <p className="rounded-lg border border-danger/30 bg-danger/5 px-[10px] py-[10px] font-bold text-danger">{error}</p>}
+    </section>
   );
 }
-
-const CodePanel = styled.section`
-  display: grid;
-  gap: 18px;
-  width: min(520px, 100%);
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-
-  h1 {
-    margin: 0;
-    font-size: clamp(1.5rem, 6vw, 2.1rem);
-  }
-
-  p {
-    margin: 8px 0 0;
-    color: var(--muted);
-  }
-`;
-
-const CodeForm = styled.form`
-  display: grid;
-  gap: 12px;
-`;
-
-const CodeInput = styled.input`
-  font-size: 1.6rem !important;
-  letter-spacing: 0.5em;
-  text-align: center;
-`;
-
-const GhostButton = styled.button`
-  min-height: 44px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--teal);
-  font-weight: 850;
-`;
-
-const PortalError = styled(InlineError)`
-  padding: 10px 12px;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  background: #fff1f2;
-  color: #b91c1c;
-`;

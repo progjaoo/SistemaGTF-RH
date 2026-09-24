@@ -1,7 +1,6 @@
 import { Search } from "lucide-react";
-import styled from "styled-components";
+import { Button } from "@/components/ui/button";
 import type { EmployeePortalSearchResult } from "../../types";
-import { Button, Field, InlineError } from "../ui";
 
 export function NameSearch({
   query,
@@ -21,20 +20,21 @@ export function NameSearch({
   onSelect: (employee: EmployeePortalSearchResult) => void;
 }) {
   return (
-    <SearchPanel>
+    <section className="grid w-[min(520px,100%)] gap-[18px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_48px_rgb(32_38_44/0.08)]">
       <div>
-        <h1>Portal do Colaborador</h1>
-        <p>Digite seu nome para confirmar o almoço lançado para você.</p>
+        <h1 className="m-0 text-[clamp(1.8rem,7vw,2.6rem)]">Portal do Colaborador</h1>
+        <p className="mt-2 text-muted">Digite seu nome para confirmar o almoço lançado para você.</p>
       </div>
 
-      <SearchForm
+      <form
+        className="grid gap-3"
         onSubmit={(event) => {
           event.preventDefault();
           onSearch();
         }}
       >
-        <Field>
-          <label htmlFor="employee-name">Nome</label>
+        <div className="grid gap-[6px]">
+          <label htmlFor="employee-name" className="text-[0.82rem] font-bold text-muted">Nome</label>
           <input
             id="employee-name"
             value={query}
@@ -42,88 +42,32 @@ export function NameSearch({
             placeholder="Digite parte do seu nome"
             autoComplete="name"
             required
+            className="min-h-10 w-full rounded-lg border border-line bg-white px-[10px] py-2 text-ink focus:border-teal focus:outline-none"
           />
-        </Field>
+        </div>
         <Button type="submit" disabled={loading}>
           <Search size={17} />
           {loading ? "Buscando..." : "Buscar"}
         </Button>
-      </SearchForm>
+      </form>
 
-      {error && <PortalError>{error}</PortalError>}
+      {error && <p className="rounded-lg border border-danger/30 bg-danger/5 px-[10px] py-[10px] font-bold text-danger">{error}</p>}
 
       {results.length > 0 && (
-        <ResultsList>
-          <span>Selecione seu cadastro</span>
+        <div className="grid gap-2">
+          <span className="text-[0.86rem] font-extrabold text-muted">Selecione seu cadastro</span>
           {results.map((employee) => (
-            <button key={employee.id} type="button" onClick={() => onSelect(employee)}>
+            <button
+              key={employee.id}
+              type="button"
+              onClick={() => onSelect(employee)}
+              className="min-h-[46px] w-full rounded-lg border border-line bg-white px-3 py-[10px] text-left font-extrabold text-ink hover:border-teal/40 hover:bg-teal-bg"
+            >
               {employee.name}
             </button>
           ))}
-        </ResultsList>
+        </div>
       )}
-    </SearchPanel>
+    </section>
   );
 }
-
-const SearchPanel = styled.section`
-  display: grid;
-  gap: 18px;
-  width: min(520px, 100%);
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-
-  h1 {
-    margin: 0;
-    font-size: clamp(1.8rem, 7vw, 2.6rem);
-  }
-
-  p {
-    margin: 8px 0 0;
-    color: var(--muted);
-  }
-`;
-
-const SearchForm = styled.form`
-  display: grid;
-  gap: 12px;
-`;
-
-const ResultsList = styled.div`
-  display: grid;
-  gap: 8px;
-
-  span {
-    color: var(--muted);
-    font-size: 0.86rem;
-    font-weight: 800;
-  }
-
-  button {
-    width: 100%;
-    min-height: 46px;
-    padding: 10px 12px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: #fff;
-    color: var(--ink);
-    font-weight: 800;
-    text-align: left;
-  }
-
-  button:hover {
-    border-color: rgba(15, 118, 110, 0.36);
-    background: var(--teal-soft);
-  }
-`;
-
-const PortalError = styled(InlineError)`
-  padding: 10px 12px;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  background: #fff1f2;
-  color: #b91c1c;
-`;

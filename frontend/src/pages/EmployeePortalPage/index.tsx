@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import styled from "styled-components";
+import { toast } from "sonner";
 import { api } from "../../api";
 import { BrandLogo } from "../../components/layout";
 import { AccessCodeStep } from "../../components/employee-portal/AccessCodeStep";
@@ -149,6 +149,8 @@ export default function EmployeePortalPage() {
     try {
       const response = await api.employeePortalCheckin(selectedEmployee.id, date, status, portalToken, note);
       setDays((currentDays) => currentDays.map((day) => (day.id === response.record.id ? response.record : day)));
+      if (status === "PEGUEI") toast.success("Almoço confirmado. Bom apetite!");
+      else toast.info("Registrado: você não pegou o almoço.");
     } catch (error) {
       if (error instanceof Error && /expirada|autenticado|inválida/i.test(error.message)) {
         setDays(previousDays);
@@ -156,21 +158,23 @@ export default function EmployeePortalPage() {
         return;
       }
       setDays(previousDays);
-      setCalendarError(error instanceof Error ? error.message : "Não foi possível salvar a confirmação.");
+      const message = error instanceof Error ? error.message : "Não foi possível salvar a confirmação.";
+      setCalendarError(message);
+      toast.error(message);
     } finally {
       setSavingDate("");
     }
   }
 
   return (
-    <PortalLayout>
-      <PortalHeader>
+    <main className="grid min-h-[100dvh] content-start justify-items-center gap-5 bg-paper bg-[linear-gradient(90deg,rgb(43_168_162/0.08)_0_1px,transparent_1px_100%)] bg-[length:42px_42px] p-[clamp(18px,5vw,42px)]">
+      <header className="flex w-[min(760px,100%)] items-center gap-[14px] text-ink">
         <BrandLogo src={logoGtf} alt="Grupo GTF" className="h-[54px] w-[92px]" />
         <div>
-          <strong>GTF - Recursos Humanos</strong>
-          <span>Controle de Almoços</span>
+          <strong className="block text-[1.05rem]">GTF - Recursos Humanos</strong>
+          <span className="block font-bold text-muted">Controle de Almoços</span>
         </div>
-      </PortalHeader>
+      </header>
 
       {step === "search" && (
         <NameSearch
@@ -215,40 +219,6 @@ export default function EmployeePortalPage() {
           }}
         />
       )}
-    </PortalLayout>
+    </main>
   );
 }
-
-const PortalLayout = styled.main`
-  display: grid;
-  align-content: start;
-  justify-items: center;
-  gap: 20px;
-  min-height: 100vh;
-  padding: clamp(18px, 5vw, 42px);
-  background:
-    linear-gradient(90deg, rgba(15, 118, 110, 0.08) 0 1px, transparent 1px 100%) 0 0 / 42px 42px,
-    var(--paper);
-`;
-
-const PortalHeader = styled.header`
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: min(760px, 100%);
-  color: var(--ink);
-
-  strong,
-  span {
-    display: block;
-  }
-
-  strong {
-    font-size: 1.05rem;
-  }
-
-  span {
-    color: var(--muted);
-    font-weight: 750;
-  }
-`;
