@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarCheck, Search, ShieldCheck, Soup, Users, WalletCards, X } from "lucide-react";
+import { Toaster } from "@/components/ui/sonner";
 import { api } from "./api";
 import { Eyebrow, Main, Shell, Sidebar, Toolbar, Topbar } from "./components/layout";
 import { Alert, Button, IconButton, Loading } from "./components/ui";
@@ -105,11 +106,21 @@ export default function App() {
   const isEmployeePortal = window.location.pathname.endsWith("/colaborador") || window.location.pathname.endsWith("/colaborador/");
 
   if (isEmployeePortal) {
-    return <EmployeePortalPage />;
+    return (
+      <>
+        <EmployeePortalPage />
+        <Toaster position="bottom-center" />
+      </>
+    );
   }
 
   if (!session) {
-    return <LoginPage onLogin={handleLogin} />;
+    return (
+      <>
+        <LoginPage onLogin={handleLogin} />
+        <Toaster position="top-center" />
+      </>
+    );
   }
 
   const isRh = session.user.role === "RH";
@@ -124,6 +135,7 @@ export default function App() {
 
   return (
     <Shell $collapsed={sidebarCollapsed}>
+      <Toaster position="top-center" />
       <Sidebar
         tabs={tabs}
         activeTab={activeTab}
