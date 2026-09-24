@@ -1,0 +1,51 @@
+@import "tailwindcss";
+@import "@fontsource/outfit/400.css";
+@import "@fontsource/outfit/700.css";
+@import "@fontsource/outfit/800.css";
+@import "@fontsource/outfit/900.css";
+
+@theme {
+  --color-teal: #2BA8A2;
+  --color-teal-hover: #3CC4BD;
+  --color-teal-deep: #1E8C86;
+  --color-teal-bg: #E8F6F5;
+  --color-gold: #FFD23F;
+  --color-gold-soft: #FFE47A;
+  --color-gold-deep: #E6B800;
+  --color-coral: #EF6C4A;
+  --color-coral-deep: #D45233;
+  --color-cream: #FFF8E7;
+  --color-sky: #5DADE2;
+  --color-paper: #EFF8F7;
+  --color-success: #27AE60;
+  --color-danger: #E74C3C;
+  --color-ink: #20262c;
+  --color-muted: #68717c;
+  --color-line: #d9e0e6;
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  @apply bg-paper text-ink font-sans antialiased;
+  background-image: linear-gradient(90deg, rgb(43 168 162 / 0.08) 0 1px, transparent 1px 100%);
+  background-size: 42px 42px;
+}
+
+button { cursor: pointer; }
+button:active:not(:disabled) { transform: scale(0.98); }
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="dialog"]:focus-visible {
+  outline: 3px solid rgb(43 168 162 / 0.35);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
