@@ -149,8 +149,7 @@ export default function EmployeePortalPage() {
     try {
       const response = await api.employeePortalCheckin(selectedEmployee.id, date, status, portalToken, note);
       setDays((currentDays) => currentDays.map((day) => (day.id === response.record.id ? response.record : day)));
-      if (status === "PEGUEI") toast.success("Almoço confirmado. Bom apetite!");
-      else toast.info("Registrado: você não pegou o almoço.");
+      if (status === "NAO_PEGUEI") toast.info("Registrado: você não pegou o almoço.");
     } catch (error) {
       if (error instanceof Error && /expirada|autenticado|inválida/i.test(error.message)) {
         setDays(previousDays);
