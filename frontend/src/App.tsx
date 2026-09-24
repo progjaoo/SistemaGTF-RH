@@ -133,8 +133,8 @@ export default function App() {
   ] satisfies NavigationTab[]).filter((tab) => !tab.rhOnly || isRh);
 
   return (
+    <>
     <Shell collapsed={sidebarCollapsed}>
-      <Toaster position="top-center" />
       <Sidebar
         tabs={tabs}
         activeTab={activeTab}
@@ -275,6 +275,10 @@ export default function App() {
           />
         )}
       </Main>
-    </Shell>
+      </Shell>
+      {/* Toaster fora do grid: a section vazia do sonner (sem toasts) é
+          position:static e roubaria uma coluna se fosse filha do Shell. */}
+      <Toaster position="top-center" />
+    </>
   );
 }
