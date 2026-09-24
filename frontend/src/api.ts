@@ -72,6 +72,18 @@ export const api = {
       body: JSON.stringify(payload)
     });
   },
+  updateMealPrice(token: string, id: string, payload: { value: number; validFrom: string; validTo?: string | null; employeeId?: string | null }) {
+    return request<{ price: MealPrice }>(`/meal-prices/${id}`, token, {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    });
+  },
+  closeMealPrice(token: string, id: string, endDate: string) {
+    return request<{ price: MealPrice }>(`/meal-prices/${id}/close`, token, {
+      method: "POST",
+      body: JSON.stringify({ endDate })
+    });
+  },
   periods(token: string) {
     return request<{ periods: BillingPeriod[] }>("/billing-periods", token);
   },

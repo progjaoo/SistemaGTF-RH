@@ -247,12 +247,11 @@ export default function App() {
         )}
         {activeTab === "prices" && isRh && (
           <PricesPage
+            token={session.token}
             prices={prices}
             employees={employees}
-            onSave={async (payload) => {
-              await api.createMealPrice(session.token, payload);
+            onReload={async () => {
               await loadWorkspace(session);
-              toast.success("Preço cadastrado.");
             }}
           />
         )}

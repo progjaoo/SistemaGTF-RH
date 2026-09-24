@@ -33,6 +33,7 @@ export type MealPrice = {
   value: number;
   validFrom: string;
   validTo: string | null;
+  status: "VIGENTE" | "FUTURA" | "ENCERRADA";
   employeeId: string | null;
   employee: Pick<Employee, "id" | "name"> | null;
 };
