@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarCheck, Search, ShieldCheck, Soup, Users, WalletCards, X } from "lucide-react";
+import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { api } from "./api";
 import { Eyebrow, Main, Shell, Sidebar, Toolbar, Topbar } from "./components/layout";
@@ -206,12 +207,13 @@ export default function App() {
                 );
               const result = await api.saveMealRecords(session.token, selectedPeriod.id, entries);
               setWarnings(result.warnings);
-              setNotice(result.warnings.length ? "Lançamentos salvos com alertas de jornada." : "Lançamentos salvos.");
+              if (result.warnings.length) toast.warning("Lançamentos salvos com alertas de jornada.");
+              else toast.success("Lançamentos salvos.");
               await refreshSelectedPeriod();
             }}
             onImported={async () => {
               await refreshSelectedPeriod();
-              setNotice("Planilha importada e lançamentos recarregados.");
+              toast.success("Planilha importada e lançamentos recarregados.");
             }}
           />
         )}

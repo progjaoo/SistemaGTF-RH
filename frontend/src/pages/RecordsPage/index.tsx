@@ -45,7 +45,9 @@ import {
   SortHint
 } from "../../components/records/styles";
 import { api } from "../../api";
-import { Badge, Button, DataTable, EmptyState, Panel, PanelHeader } from "../../components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DataTable, EmptyState, Panel, PanelHeader } from "../../components/ui";
 import { SpreadsheetImport } from "../../components/records/SpreadsheetImport";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useMealConfirmationRealtime } from "../../hooks/useMealConfirmationRealtime";
@@ -267,23 +269,23 @@ export default function RecordsPage({
             <CheckCircle2 size={17} />
             Marcar para todos os {visibleEmployees.length} exibidos
           </Button>
-          <Button type="button" $variant="ghost" onClick={() => setVisibleQuantity(0)} disabled={readOnly || selectedDateIsFuture || visibleEmployees.length === 0}>
+          <Button type="button" variant="outline" onClick={() => setVisibleQuantity(0)} disabled={readOnly || selectedDateIsFuture || visibleEmployees.length === 0}>
             <X size={17} />
             Desmarcar exibidos
           </Button>
-          <Button type="button" $variant="ghost" onClick={() => exportMealSpreadsheet(period, exportSummary)} disabled={visibleEmployees.length === 0}>
+          <Button type="button" variant="outline" onClick={() => exportMealSpreadsheet(period, exportSummary)} disabled={visibleEmployees.length === 0}>
             <Download size={17} />
             Exportar planilha
           </Button>
-          <Button type="button" $variant="ghost" onClick={() => exportMealConferencePdf(period, exportSummary)} disabled={visibleEmployees.length === 0}>
+          <Button type="button" variant="outline" onClick={() => exportMealConferencePdf(period, exportSummary)} disabled={visibleEmployees.length === 0}>
             <FileText size={17} />
             Gerar PDF
           </Button>
-          <Button type="button" $variant="ghost" onClick={() => setShowImport((current) => !current)} disabled={readOnly}>
+          <Button type="button" variant="outline" onClick={() => setShowImport((current) => !current)} disabled={readOnly}>
             <Upload size={17} />
             Importar planilha
           </Button>
-          <Button type="button" $variant="ghost" onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
+          <Button type="button" variant="outline" onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
             <ClipboardCheck size={17} />
             Verificar quem Pegou
           </Button>
@@ -305,13 +307,13 @@ export default function RecordsPage({
               </p>
             </div>
             <BulkActions>
-              <Button type="button" $variant={confirmationScope === "DAY" ? "solid" : "ghost"} onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
+              <Button type="button" variant={confirmationScope === "DAY" ? "primary" : "outline"} onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
                 Dia atual
               </Button>
-              <Button type="button" $variant={confirmationScope === "PERIOD" ? "solid" : "ghost"} onClick={() => loadConfirmations("PERIOD")} disabled={loadingConfirmations}>
+              <Button type="button" variant={confirmationScope === "PERIOD" ? "primary" : "outline"} onClick={() => loadConfirmations("PERIOD")} disabled={loadingConfirmations}>
                 Período inteiro
               </Button>
-              <Button type="button" $variant="ghost" onClick={() => setConfirmationScope(null)}>
+              <Button type="button" variant="outline" onClick={() => setConfirmationScope(null)}>
                 Fechar
               </Button>
             </BulkActions>
@@ -341,7 +343,7 @@ export default function RecordsPage({
                     <td>{fullDate(confirmation.date)}</td>
                     <td>{confirmation.quantity}</td>
                     <td>
-                      <Badge $tone={confirmation.confirmationStatus === "PEGUEI" ? "good" : confirmation.confirmationStatus === "NAO_PEGUEI" ? "warn" : "muted"}>
+                      <Badge variant={confirmation.confirmationStatus === "PEGUEI" ? "good" : confirmation.confirmationStatus === "NAO_PEGUEI" ? "warn" : "muted"}>
                         {confirmation.confirmationStatus === "PEGUEI" ? "Peguei" : confirmation.confirmationStatus === "NAO_PEGUEI" ? "Não peguei" : "Pendente"}
                       </Badge>
                     </td>
@@ -364,7 +366,7 @@ export default function RecordsPage({
           const warning = warningByEmployee.get(employee.id);
 
           return (
-            <EmployeeMealCard key={employee.id} $warn={Boolean(warning)}>
+            <EmployeeMealCard key={employee.id} warn={Boolean(warning)}>
               <EmployeeIdentity>
                 <EmployeeInitials aria-hidden="true">{initials(employee.name)}</EmployeeInitials>
                 <div>
