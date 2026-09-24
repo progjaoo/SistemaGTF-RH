@@ -50,7 +50,8 @@ const checkinSchema = z.object({
 
 const portalLoginSchema = z.object({
   employeeId: z.string(),
-  code: z.string().regex(/^\d{6}$/, "Código com 6 dígitos.")
+  code: z.string().regex(/^\d{6}$/, "Código com 6 dígitos."),
+  remember: z.boolean().optional().default(false)
 });
 
 function monthBounds(month: string) {
@@ -128,18 +129,29 @@ employeePortalRouter.post("/login", portalLoginLimiter, asyncHandler(async (req,
     return res.status(401).json({ message: "Código inválido." });
   }
 
-  const token = jwt.sign({ sub: employee.id, scope: "employee-portal" }, config.jwtSecret, { expiresIn: "8h" });
+  const token = jwt.sign({ sub: employee.id, scope: "employee-portal" }, config.jwtSecret, {
+    expiresIn: input.remember ? "30d" : "8h"
+  });
+
+  // Ativação: primeiro login com código marca o acesso como ativo.
+  const isFirstAccess = !employee.firstPortalAccessAt;
+  if (isFirstAccess) {
+    await prisma.employee.update({
+      where: { id: employee.id },
+      data: { firstPortalAccessAt: new Date() }
+    });
+  }
 
   await prisma.auditLog.create({
     data: {
       entity: "Employee",
       entityId: employee.id,
-      action: "PORTAL_LOGIN",
-      metadata: { ip: req.ip ?? null, userAgent: req.get("user-agent") ?? null }
+      action: isFirstAccess ? "PORTAL_ACTIVATED" : "PORTAL_LOGIN",
+      metadata: { ip: req.ip ?? null, userAgent: req.get("user-agent") ?? null, remember: input.remember }
     }
   });
 
-  res.json({ token, employee: { id: employee.id, name: employee.name } });
+  res.json({ token, employee: { id: employee.id, name: employee.name }, portalStatus: "active" });
 }));
 
 employeePortalRouter.get("/:employeeId/calendar", authenticatePortal, asyncHandler(async (req, res) => {

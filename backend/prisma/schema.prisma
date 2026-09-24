@@ -39,6 +39,9 @@ model Employee {
   // 6 dígitos. Null = sem acesso (procure o RH). Nunca expor na API.
   accessCodeHash      String?
   accessCodeUpdatedAt DateTime?
+  // Ativação do portal (PLAN-003): preenchido no primeiro login com código.
+  // Null = pendente (código gerado, nunca usado).
+  firstPortalAccessAt DateTime?
   admissionDate   DateTime?      @db.Date
   terminationDate DateTime?      @db.Date
   createdAt       DateTime       @default(now())

@@ -50,6 +50,7 @@ const serializeEmployee = (employee: {
   scheduleType: ScheduleType;
   workdays: string | null;
   accessCodeHash: string | null;
+  firstPortalAccessAt: Date | null;
   admissionDate: Date | null;
   terminationDate: Date | null;
   createdAt: Date;
@@ -60,8 +61,9 @@ const serializeEmployee = (employee: {
   status: employee.status,
   scheduleType: employee.scheduleType,
   workdays: serializeWorkdays(employee.workdays),
-  // Nunca expor accessCodeHash: só o sinalizador.
+  // Nunca expor accessCodeHash: só sinalizadores.
   hasAccessCode: employee.accessCodeHash !== null,
+  portalAccess: (!employee.accessCodeHash ? "none" : !employee.firstPortalAccessAt ? "pending" : "active") as "none" | "pending" | "active",
   admissionDate: employee.admissionDate?.toISOString().slice(0, 10) ?? null,
   terminationDate: employee.terminationDate?.toISOString().slice(0, 10) ?? null
 });
