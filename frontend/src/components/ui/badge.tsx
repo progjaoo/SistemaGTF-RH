@@ -9,11 +9,11 @@ const badgeVariants = cva(
     variants: {
       variant: {
         good: "bg-teal-bg text-teal-deep",
-        warn: "bg-gold-soft text-[#8a6d00]",
+        warn: "bg-gold-soft text-[#6b5600]",
         muted: "bg-[#edf0f3] text-muted",
         info: "bg-sky/15 text-[#2b7cb0]",
         special: "bg-gold text-ink",
-        danger: "bg-danger/10 text-danger",
+        danger: "bg-danger/10 text-danger-ink",
       },
     },
     defaultVariants: {

@@ -60,7 +60,7 @@ export function AccessCodeStep({
         </button>
       </form>
 
-      {error && <p className="rounded-lg border border-danger/30 bg-danger/5 px-[10px] py-[10px] font-bold text-danger">{error}</p>}
+      {error && <p className="rounded-lg border border-danger/30 bg-danger/5 px-[10px] py-[10px] font-bold text-danger-ink">{error}</p>}
     </section>
   );
 }

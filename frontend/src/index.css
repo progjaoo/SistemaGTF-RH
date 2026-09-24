@@ -8,6 +8,7 @@
   --color-teal: #2BA8A2;
   --color-teal-hover: #3CC4BD;
   --color-teal-deep: #1E8C86;
+  --color-teal-ink: #145e59;
   --color-teal-bg: #E8F6F5;
   --color-gold: #FFD23F;
   --color-gold-soft: #FFE47A;
@@ -17,8 +18,11 @@
   --color-cream: #FFF8E7;
   --color-sky: #5DADE2;
   --color-paper: #EFF8F7;
+  --color-surface: #FFFFFF;
+  --color-steel: #34495e;
   --color-success: #27AE60;
   --color-danger: #E74C3C;
+  --color-danger-ink: #B3261E;
   --color-ink: #20262c;
   --color-muted: #68717c;
   --color-line: #d9e0e6;

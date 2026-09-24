@@ -105,7 +105,7 @@ export function EmployeeCalendar({
         </button>
       </div>
 
-      {error && <div className="rounded-lg border border-danger/30 bg-danger/5 px-[10px] py-[10px] font-extrabold text-danger">{error}</div>}
+      {error && <div className="rounded-lg border border-danger/30 bg-danger/5 px-[10px] py-[10px] font-extrabold text-danger-ink">{error}</div>}
 
       {loading ? (
         <div className="rounded-lg border border-dashed border-line bg-white/70 p-7 text-muted">Carregando calendário...</div>

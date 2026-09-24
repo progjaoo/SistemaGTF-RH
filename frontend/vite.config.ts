@@ -8,7 +8,7 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
   base: process.env.VITE_BASE_PATH ?? "/",
   build: {
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 500,
     rollupOptions: {
       output: {
         manualChunks: {

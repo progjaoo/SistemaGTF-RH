@@ -25,7 +25,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "sticky top-0 grid h-[100dvh] gap-6 overflow-hidden border-r-[5px] border-teal bg-teal-deep p-6 text-white transition-[padding,gap]",
+        "sticky top-0 grid h-[100dvh] gap-6 overflow-hidden border-r-[5px] border-teal bg-teal-ink p-6 text-white transition-[padding,gap]",
         collapsed ? "grid-rows-[1fr_auto] gap-5 px-3 py-[22px]" : "grid-rows-[auto_1fr_auto]",
         "max-[900px]:sticky max-[900px]:z-20 max-[900px]:h-auto max-[900px]:grid-cols-[1fr_auto] max-[900px]:grid-rows-[auto_auto] max-[900px]:gap-[10px] max-[900px]:overflow-visible max-[900px]:border-r-0 max-[900px]:border-b-4 max-[900px]:border-teal max-[900px]:p-3"
       )}

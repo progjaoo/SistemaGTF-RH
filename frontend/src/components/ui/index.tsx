@@ -108,5 +108,5 @@ export function EmptyState({ children }: { children: ReactNode }) {
 }
 
 export function InlineError({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("font-bold text-danger", className)}>{children}</div>;
+  return <div className={cn("font-bold text-danger-ink", className)}>{children}</div>;
 }
