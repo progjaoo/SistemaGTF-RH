@@ -1,4 +1,3 @@
-import styled from "styled-components";
 import {
   Bar,
   BarChart,
@@ -19,7 +18,13 @@ const shortDate = (value: string) =>
   new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(new Date(`${value}T00:00:00`));
 
 export default function DashboardView({ dashboard }: { dashboard: DashboardSummary | null }) {
-  if (!dashboard) return <EmptyState>Selecione um período para visualizar o dashboard.</EmptyState>;
+  if (!dashboard) {
+    return (
+      <div className="rounded-lg border border-dashed border-line bg-white/70 p-7 text-muted">
+        Selecione um período para visualizar o dashboard.
+      </div>
+    );
+  }
 
   const trend = dashboard.current.dailyTrend.map((item) => ({
     ...item,
@@ -27,57 +32,63 @@ export default function DashboardView({ dashboard }: { dashboard: DashboardSumma
   }));
 
   return (
-    <SectionGrid>
-      <KpiGrid>
+    <div className="grid gap-[18px] max-[520px]:gap-3">
+      <div className="grid grid-cols-3 gap-[14px] max-[800px]:grid-cols-1 max-[520px]:gap-[10px]">
         <KpiCard title="Almoços no período" value={dashboard.current.totalQuantity.toString()} detail={deltaText(dashboard.quantityDelta, "un.")} />
         <KpiCard title="Total a pagar" value={formatCurrency(dashboard.current.totalAmount)} detail={deltaText(dashboard.amountDelta, "R$")} />
         <KpiCard title="Funcionários com consumo" value={dashboard.current.employeeTotals.length.toString()} detail={dashboard.current.period.status === "OPEN" ? "Período aberto" : "Período fechado"} />
-      </KpiGrid>
+      </div>
 
-      <Panel>
-        <PanelHeader>
-          <h2>Evolução diária</h2>
-        </PanelHeader>
-        <ChartFrame>
+      <section className="min-w-0 rounded-lg border border-line bg-surface p-[18px] shadow-[0_18px_48px_rgb(32_38_44/0.08)] max-[520px]:p-[14px] max-[520px]:px-[10px]">
+        <div className="mb-[14px]">
+          <h2 className="m-0 text-[1.05rem]">Evolução diária</h2>
+        </div>
+        <div className="min-h-[280px] w-full min-w-0 overflow-hidden max-[520px]:min-h-[240px]">
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={trend} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#d9e0e6" />
               <XAxis dataKey="label" />
               <YAxis allowDecimals={false} />
-              <Tooltip formatter={(value) => [value, "Almoços"]} />
-              <Line type="monotone" dataKey="quantity" stroke="#0f766e" strokeWidth={3} dot={{ r: 3 }} />
+              <Tooltip
+                formatter={(value) => [value, "Almoços"]}
+                contentStyle={{ background: "#20262c", color: "#fff", border: "none", borderRadius: 8 }}
+              />
+              <Line type="monotone" dataKey="quantity" stroke="#2BA8A2" strokeWidth={3} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
-        </ChartFrame>
-      </Panel>
+        </div>
+      </section>
 
-      <Panel>
-        <PanelHeader>
-          <h2>Ranking de consumo</h2>
-        </PanelHeader>
-        <ChartFrame>
+      <section className="min-w-0 rounded-lg border border-line bg-surface p-[18px] shadow-[0_18px_48px_rgb(32_38_44/0.08)] max-[520px]:p-[14px] max-[520px]:px-[10px]">
+        <div className="mb-[14px]">
+          <h2 className="m-0 text-[1.05rem]">Ranking de consumo</h2>
+        </div>
+        <div className="min-h-[280px] w-full min-w-0 overflow-hidden max-[520px]:min-h-[240px]">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={dashboard.current.employeeTotals.slice(0, 8)} layout="vertical" margin={{ top: 5, right: 20, left: 48, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#d9e0e6" />
               <XAxis type="number" allowDecimals={false} />
               <YAxis type="category" dataKey="employeeName" width={92} />
-              <Tooltip formatter={(value) => [value, "Almoços"]} />
-              <Bar dataKey="quantity" fill="#34495e" radius={[0, 4, 4, 0]} />
+              <Tooltip
+                formatter={(value) => [value, "Almoços"]}
+                contentStyle={{ background: "#20262c", color: "#fff", border: "none", borderRadius: 8 }}
+              />
+              <Bar dataKey="quantity" fill="#1E8C86" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </ChartFrame>
-      </Panel>
-    </SectionGrid>
+        </div>
+      </section>
+    </div>
   );
 }
 
 function KpiCard({ title, value, detail }: { title: string; value: string; detail: string }) {
   return (
-    <Kpi>
-      <span>{title}</span>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </Kpi>
+    <article className="rounded-lg border border-line border-l-[5px] border-l-teal bg-surface p-[18px] shadow-[0_18px_48px_rgb(32_38_44/0.08)] max-[520px]:p-[14px]">
+      <span className="block text-muted">{title}</span>
+      <strong className="my-2 block text-[2rem] tracking-normal tabular-nums max-[520px]:text-[1.65rem]">{value}</strong>
+      <small className="block text-muted">{detail}</small>
+    </article>
   );
 }
 
@@ -86,101 +97,3 @@ function deltaText(value: number | null, unit: string) {
   if (unit === "R$") return `${value >= 0 ? "+" : ""}${formatCurrency(value)} vs. anterior`;
   return `${value >= 0 ? "+" : ""}${value} ${unit} vs. anterior`;
 }
-
-const SectionGrid = styled.div`
-  display: grid;
-  gap: 18px;
-
-  @media (max-width: 520px) {
-    gap: 12px;
-  }
-`;
-
-const KpiGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-
-  @media (max-width: 800px) {
-    grid-template-columns: 1fr;
-  }
-
-  @media (max-width: 520px) {
-    gap: 10px;
-  }
-`;
-
-const Kpi = styled.article`
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-left: 5px solid var(--teal);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-
-  span,
-  small {
-    display: block;
-    color: var(--muted);
-  }
-
-  strong {
-    display: block;
-    margin: 8px 0 6px;
-    font-size: 2rem;
-    letter-spacing: 0;
-  }
-
-  @media (max-width: 520px) {
-    padding: 14px;
-
-    strong {
-      font-size: 1.65rem;
-    }
-  }
-`;
-
-const Panel = styled.section`
-  min-width: 0;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-
-  @media (max-width: 520px) {
-    padding: 14px 10px;
-  }
-`;
-
-const PanelHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-
-  h2 {
-    margin: 0;
-    font-size: 1.05rem;
-  }
-`;
-
-const ChartFrame = styled.div`
-  width: 100%;
-  min-height: 280px;
-  min-width: 0;
-  overflow: hidden;
-
-  @media (max-width: 520px) {
-    min-height: 240px;
-  }
-`;
-
-const EmptyState = styled.div`
-  padding: 28px;
-  border: 1px dashed var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
-  color: var(--muted);
-`;
