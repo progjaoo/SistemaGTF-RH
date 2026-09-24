@@ -22,6 +22,8 @@ export type Employee = {
   workdays: number[] | null;
   // True = colaborador tem código de acesso ao portal (hash nunca trafega).
   hasAccessCode: boolean;
+  // none = sem código; pending = código gerado, nunca usado; active = já entrou.
+  portalAccess: "none" | "pending" | "active";
   admissionDate: string | null;
   terminationDate: string | null;
 };

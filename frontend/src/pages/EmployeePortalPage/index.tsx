@@ -16,10 +16,14 @@ type Step = "search" | "code" | "calendar";
 
 function loadSession(): { token: string; employee: EmployeePortalSearchResult } | null {
   try {
-    const token = sessionStorage.getItem(TOKEN_KEY);
-    const raw = sessionStorage.getItem(EMPLOYEE_KEY);
-    if (!token || !raw) return null;
-    return { token, employee: JSON.parse(raw) as EmployeePortalSearchResult };
+    // "Manter conectado" (30 dias) vive no localStorage; sessão de turno (8h), no sessionStorage.
+    const stores = [localStorage, sessionStorage];
+    for (const store of stores) {
+      const token = store.getItem(TOKEN_KEY);
+      const raw = store.getItem(EMPLOYEE_KEY);
+      if (token && raw) return { token, employee: JSON.parse(raw) as EmployeePortalSearchResult };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -43,8 +47,10 @@ export default function EmployeePortalPage() {
   const currentMonth = useMemo(() => monthKeyInSaoPaulo(), []);
 
   function clearSession() {
-    sessionStorage.removeItem(TOKEN_KEY);
-    sessionStorage.removeItem(EMPLOYEE_KEY);
+    for (const store of [localStorage, sessionStorage]) {
+      store.removeItem(TOKEN_KEY);
+      store.removeItem(EMPLOYEE_KEY);
+    }
     setPortalToken("");
     setSelectedEmployee(null);
     setDays([]);
@@ -79,14 +85,15 @@ export default function EmployeePortalPage() {
     setStep("code");
   }
 
-  async function submitCode(code: string) {
+  async function submitCode(code: string, remember: boolean) {
     if (!selectedEmployee) return;
     setLoadingCode(true);
     setCodeError("");
     try {
-      const response = await api.employeePortalLogin(selectedEmployee.id, code);
-      sessionStorage.setItem(TOKEN_KEY, response.token);
-      sessionStorage.setItem(EMPLOYEE_KEY, JSON.stringify(response.employee));
+      const response = await api.employeePortalLogin(selectedEmployee.id, code, remember);
+      const storage = remember ? localStorage : sessionStorage;
+      storage.setItem(TOKEN_KEY, response.token);
+      storage.setItem(EMPLOYEE_KEY, JSON.stringify(response.employee));
       setPortalToken(response.token);
       setSelectedEmployee(response.employee);
       setStep("calendar");

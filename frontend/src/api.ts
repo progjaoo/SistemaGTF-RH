@@ -54,7 +54,7 @@ export const api = {
   employees(token: string) {
     return request<{ employees: Employee[] }>("/employees", token);
   },
-  saveEmployee(token: string, payload: Omit<Employee, "id" | "hasAccessCode">, id?: string) {
+  saveEmployee(token: string, payload: Omit<Employee, "id" | "hasAccessCode" | "portalAccess">, id?: string) {
     return request<{ employee: Employee }>(id ? `/employees/${id}` : "/employees", token, {
       method: id ? "PUT" : "POST",
       body: JSON.stringify(payload)
@@ -121,10 +121,10 @@ export const api = {
   employeePortalSearch(name: string) {
     return request<{ employees: EmployeePortalSearchResult[] }>(`/employee-portal/search?name=${encodeURIComponent(name)}`);
   },
-  employeePortalLogin(employeeId: string, code: string) {
-    return request<{ token: string; employee: EmployeePortalSearchResult }>(`/employee-portal/login`, undefined, {
+  employeePortalLogin(employeeId: string, code: string, remember = false) {
+    return request<{ token: string; employee: EmployeePortalSearchResult; portalStatus: "pending" | "active" }>(`/employee-portal/login`, undefined, {
       method: "POST",
-      body: JSON.stringify({ employeeId, code })
+      body: JSON.stringify({ employeeId, code, remember })
     });
   },
   employeePortalCalendar(employeeId: string, month: string, portalToken: string) {

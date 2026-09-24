@@ -13,10 +13,11 @@ export function AccessCodeStep({
   employee: EmployeePortalSearchResult;
   loading: boolean;
   error: string;
-  onSubmit: (code: string) => void;
+  onSubmit: (code: string, remember: boolean) => void;
   onBack: () => void;
 }) {
   const [code, setCode] = useState("");
+  const [remember, setRemember] = useState(false);
 
   return (
     <section className="grid w-[min(520px,100%)] gap-[18px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_48px_rgb(32_38_44/0.08)]">
@@ -29,7 +30,7 @@ export function AccessCodeStep({
         className="grid gap-3"
         onSubmit={(event) => {
           event.preventDefault();
-          onSubmit(code);
+          onSubmit(code, remember);
         }}
       >
         <div className="grid gap-[6px]">
@@ -51,6 +52,15 @@ export function AccessCodeStep({
           <KeyRound size={17} />
           {loading ? "Verificando..." : "Entrar"}
         </Button>
+        <label className="flex cursor-pointer items-center gap-2 text-[0.9rem] font-bold text-muted">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(event) => setRemember(event.target.checked)}
+            className="h-[18px] w-[18px] accent-teal-deep"
+          />
+          Manter conectado neste aparelho (30 dias)
+        </label>
         <button
           type="button"
           onClick={onBack}

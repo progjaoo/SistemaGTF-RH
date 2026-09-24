@@ -39,12 +39,12 @@ export default function EmployeesPage({
   employees: Employee[];
   canEdit: boolean;
   token: string;
-  onSave: (payload: Omit<Employee, "id" | "hasAccessCode">, id?: string) => Promise<void>;
+  onSave: (payload: Omit<Employee, "id" | "hasAccessCode" | "portalAccess">, id?: string) => Promise<void>;
   onInactivate: (id: string) => Promise<void>;
   onReload: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState<Employee | null>(null);
-  const [form, setForm] = useState<Omit<Employee, "id">>({
+  const [form, setForm] = useState<Omit<Employee, "id" | "portalAccess">>({
     name: "",
     status: "ACTIVE",
     scheduleType: "MON_FRI",
@@ -265,8 +265,20 @@ export default function EmployeesPage({
                 </td>
                 <td><Badge variant={employee.status === "ACTIVE" ? "good" : "muted"}>{statusLabels[employee.status]}</Badge></td>
                 <td>
-                  <Badge variant={employee.hasAccessCode ? "good" : "muted"}>
-                    {employee.hasAccessCode ? "Ativo" : "Pendente"}
+                  <Badge
+                    variant={
+                      employee.portalAccess === "active"
+                        ? "good"
+                        : employee.portalAccess === "pending"
+                          ? "warn"
+                          : "muted"
+                    }
+                  >
+                    {employee.portalAccess === "active"
+                      ? "Ativo"
+                      : employee.portalAccess === "pending"
+                        ? "Pendente"
+                        : "Sem acesso"}
                   </Badge>
                 </td>
                 {canEdit && (
