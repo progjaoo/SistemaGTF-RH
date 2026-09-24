@@ -82,7 +82,7 @@ export default function UsersPage({
                 <td>{user.name}</td>
                 <td>{user.email}</td>
                 <td>{user.role === "RH" ? "RH" : "Gestora"}</td>
-                <td><Badge $tone={user.active ? "good" : "muted"}>{user.active ? "Ativo" : "Inativo"}</Badge></td>
+                <td><Badge variant={user.active ? "good" : "muted"}>{user.active ? "Ativo" : "Inativo"}</Badge></td>
                 <td><Button type="button" onClick={() => startEdit(user)}>Editar</Button></td>
               </tr>
             ))}

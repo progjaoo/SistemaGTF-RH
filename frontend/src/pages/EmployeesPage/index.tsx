@@ -1,8 +1,20 @@
 import { FormEvent, useState } from "react";
 import { KeyRound, Save } from "lucide-react";
-import styled from "styled-components";
+import { toast } from "sonner";
 import { api } from "../../api";
-import { Badge, Button, DataTable, Field, FormGrid, InlineActions, Panel, PanelHeader, TwoColumn } from "../../components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { DataTable, Field, FormGrid, InlineActions, Panel, PanelHeader, TwoColumn } from "../../components/ui";
+import { cn } from "@/lib/utils";
 import type { Employee, EmployeeStatus, ScheduleType } from "../../types";
 import { scheduleLabels, statusLabels, workdayLabel } from "../../utils/labels";
 
@@ -88,6 +100,7 @@ export default function EmployeesPage({
   const [singleCode, setSingleCode] = useState<{ employeeName: string; code: string } | null>(null);
   const [batchCodes, setBatchCodes] = useState<Array<{ employeeId: string; employeeName: string; code: string }> | null>(null);
   const [delivered, setDelivered] = useState<Record<string, boolean>>({});
+  const [revokeTarget, setRevokeTarget] = useState<Employee | null>(null);
 
   async function generateCode(employee: Employee) {
     setCodeBusy(employee.id);
@@ -103,12 +116,15 @@ export default function EmployeesPage({
     }
   }
 
-  async function revokeCode(employee: Employee) {
-    if (!window.confirm(`Revogar o acesso de ${employee.name} ao portal?`)) return;
+  async function confirmRevoke() {
+    if (!revokeTarget) return;
+    const employee = revokeTarget;
+    setRevokeTarget(null);
     setCodeBusy(employee.id);
     setCodeError("");
     try {
       await api.revokeEmployeeAccessCode(token, employee.id);
+      toast.success(`Acesso de ${employee.name} revogado.`);
       await onReload();
     } catch (error) {
       setCodeError(error instanceof Error ? error.message : "Não foi possível revogar o acesso.");
@@ -166,19 +182,29 @@ export default function EmployeesPage({
             {form.scheduleType === "CUSTOM" && (
               <Field>
                 <label>Dias esperados</label>
-                <WeekdayGrid>
-                  {WEEKDAYS.map((day) => (
-                    <WeekdayChip key={day.value} $active={form.workdays?.includes(day.value) ?? false}>
-                      <input
-                        type="checkbox"
-                        checked={form.workdays?.includes(day.value) ?? false}
-                        onChange={() => toggleWorkday(day.value)}
-                        aria-label={`Esperado às ${day.label}s`}
-                      />
-                      {day.label}
-                    </WeekdayChip>
-                  ))}
-                </WeekdayGrid>
+                <div className="flex flex-wrap gap-2">
+                  {WEEKDAYS.map((day) => {
+                    const active = form.workdays?.includes(day.value) ?? false;
+                    return (
+                      <label
+                        key={day.value}
+                        className={cn(
+                          "inline-flex min-h-11 cursor-pointer items-center gap-[6px] rounded-lg border px-3 py-2 font-extrabold text-ink",
+                          active ? "border-teal bg-teal-bg" : "border-line bg-white"
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={active}
+                          onChange={() => toggleWorkday(day.value)}
+                          aria-label={`Esperado às ${day.label}s`}
+                          className="h-[18px] w-[18px] accent-teal-deep"
+                        />
+                        {day.label}
+                      </label>
+                    );
+                  })}
+                </div>
               </Field>
             )}
             <Field>
@@ -202,15 +228,15 @@ export default function EmployeesPage({
           <h2>Funcionários</h2>
         </PanelHeader>
         {canEdit && (
-          <AccessToolbar>
+          <div className="mb-3 flex flex-wrap items-center gap-[10px] [&>span]:text-[0.86rem] [&>span]:font-bold [&>span]:text-muted">
             <Button type="button" onClick={() => void generateBatch()} disabled={codeBusy === "batch"}>
               <KeyRound size={17} />
               {codeBusy === "batch" ? "Gerando..." : "Gerar códigos pendentes"}
             </Button>
             <span>Cria códigos para todos os ativos sem acesso. A lista aparece uma única vez.</span>
-          </AccessToolbar>
+          </div>
         )}
-        {codeError && <AccessError>{codeError}</AccessError>}
+        {codeError && <p className="rounded-lg border border-danger/30 bg-danger/5 p-[10px_12px] font-extrabold text-danger">{codeError}</p>}
         <DataTable>
           <thead>
             <tr>
@@ -229,9 +255,9 @@ export default function EmployeesPage({
                   {scheduleLabels[employee.scheduleType]}
                   {workdayLabel(employee.workdays) ? ` (${workdayLabel(employee.workdays)})` : ""}
                 </td>
-                <td><Badge $tone={employee.status === "ACTIVE" ? "good" : "muted"}>{statusLabels[employee.status]}</Badge></td>
+                <td><Badge variant={employee.status === "ACTIVE" ? "good" : "muted"}>{statusLabels[employee.status]}</Badge></td>
                 <td>
-                  <Badge $tone={employee.hasAccessCode ? "good" : "muted"}>
+                  <Badge variant={employee.hasAccessCode ? "good" : "muted"}>
                     {employee.hasAccessCode ? "Ativo" : "Pendente"}
                   </Badge>
                 </td>
@@ -239,19 +265,19 @@ export default function EmployeesPage({
                   <td>
                     <InlineActions>
                       <Button type="button" onClick={() => startEdit(employee)}>Editar</Button>
-                      <Button type="button" $variant="ghost" onClick={() => onInactivate(employee.id)}>Inativar</Button>
+                      <Button type="button" variant="outline" onClick={() => onInactivate(employee.id)}>Inativar</Button>
                       {employee.hasAccessCode ? (
                         <>
-                          <Button type="button" $variant="ghost" onClick={() => void generateCode(employee)} disabled={codeBusy === employee.id}>
+                          <Button type="button" variant="outline" onClick={() => void generateCode(employee)} disabled={codeBusy === employee.id}>
                             <KeyRound size={16} />
                             Reemitir
                           </Button>
-                          <Button type="button" $variant="ghost" onClick={() => void revokeCode(employee)} disabled={codeBusy === employee.id}>
+                          <Button type="button" variant="outline" onClick={() => setRevokeTarget(employee)} disabled={codeBusy === employee.id}>
                             Revogar
                           </Button>
                         </>
                       ) : (
-                        <Button type="button" $variant="ghost" onClick={() => void generateCode(employee)} disabled={codeBusy === employee.id}>
+                        <Button type="button" variant="outline" onClick={() => void generateCode(employee)} disabled={codeBusy === employee.id}>
                           <KeyRound size={16} />
                           Gerar código
                         </Button>
@@ -265,155 +291,91 @@ export default function EmployeesPage({
         </DataTable>
       </Panel>
 
-      {singleCode && (
-        <CodeOverlay onClick={() => setSingleCode(null)}>
-          <CodeModal onClick={(event) => event.stopPropagation()}>
-            <h3>Código de {singleCode.employeeName}</h3>
-            <p>Anote e entregue pessoalmente. Este código <strong>não será exibido de novo</strong> — se perder, reemita.</p>
-            <CodeValue>{singleCode.code}</CodeValue>
-            <Button type="button" onClick={() => {
-              void navigator.clipboard?.writeText(singleCode.code).catch(() => undefined);
-            }}>
+      <Dialog open={singleCode !== null} onOpenChange={(open) => { if (!open) setSingleCode(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Código de {singleCode?.employeeName}</DialogTitle>
+            <DialogDescription>
+              Anote e entregue pessoalmente. Este código <strong>não será exibido de novo</strong> — se perder, reemita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-dashed border-teal bg-teal-bg p-3 text-center text-[2.2rem] font-black tracking-[0.35em]">
+            {singleCode?.code}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              onClick={() => {
+                if (singleCode) void navigator.clipboard?.writeText(singleCode.code).catch(() => undefined);
+              }}
+            >
               Copiar código
             </Button>
-            <Button type="button" $variant="ghost" onClick={() => setSingleCode(null)}>
-              Fechar (não mostra mais)
-            </Button>
-          </CodeModal>
-        </CodeOverlay>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {batchCodes && (
-        <CodeOverlay onClick={() => undefined}>
-          <CodeModal $wide onClick={(event) => event.stopPropagation()}>
-            <h3>Lista de distribuição — aparece uma única vez</h3>
-            <p>Imprima ou anote e entregue dentro da empresa. Marque "entregue" por linha e encerre — depois só reemissão.</p>
-            <DataTable>
-              <thead>
-                <tr>
-                  <th>Funcionário</th>
-                  <th>Código</th>
-                  <th>Entregue</th>
+      <Dialog open={batchCodes !== null} onOpenChange={() => undefined}>
+        <DialogContent className="max-w-[640px]" onInteractOutside={(event) => event.preventDefault()} onEscapeKeyDown={(event) => event.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>Lista de distribuição — aparece uma única vez</DialogTitle>
+            <DialogDescription>
+              Imprima ou anote e entregue dentro da empresa. Marque "entregue" por linha e encerre — depois só reemissão.
+            </DialogDescription>
+          </DialogHeader>
+          <DataTable>
+            <thead>
+              <tr>
+                <th>Funcionário</th>
+                <th>Código</th>
+                <th>Entregue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(batchCodes ?? []).map((item) => (
+                <tr key={item.employeeId}>
+                  <td>{item.employeeName}</td>
+                  <td><span className="text-[1.2rem] font-black tracking-[0.35em]">{item.code}</span></td>
+                  <td>
+                    <Checkbox
+                      checked={delivered[item.employeeId] ?? false}
+                      onCheckedChange={() => setDelivered((current) => ({ ...current, [item.employeeId]: !current[item.employeeId] }))}
+                      aria-label={`Código entregue a ${item.employeeName}`}
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {batchCodes.map((item) => (
-                  <tr key={item.employeeId}>
-                    <td>{item.employeeName}</td>
-                    <td><CodeValue $inline>{item.code}</CodeValue></td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={delivered[item.employeeId] ?? false}
-                        onChange={() => setDelivered((current) => ({ ...current, [item.employeeId]: !current[item.employeeId] }))}
-                        aria-label={`Código entregue a ${item.employeeName}`}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </DataTable>
-            <Button type="button" onClick={() => window.print()}>
+              ))}
+            </tbody>
+          </DataTable>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => window.print()}>
               Imprimir lista
             </Button>
-            <Button type="button" $variant="ghost" onClick={() => setBatchCodes(null)}>
+            <Button type="button" onClick={() => setBatchCodes(null)}>
               Encerrar distribuição (some da tela)
             </Button>
-          </CodeModal>
-        </CodeOverlay>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={revokeTarget !== null} onOpenChange={(open) => { if (!open) setRevokeTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revogar acesso</DialogTitle>
+            <DialogDescription>
+              Revogar o acesso de {revokeTarget?.name} ao portal? O código atual para de funcionar na hora.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setRevokeTarget(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="danger" onClick={() => void confirmRevoke()}>
+              Revogar acesso
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TwoColumn>
   );
 }
-
-const WeekdayGrid = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-`;
-
-const WeekdayChip = styled.label<{ $active: boolean }>`
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid ${({ $active }) => ($active ? "var(--teal)" : "var(--line)")};
-  border-radius: 8px;
-  background: ${({ $active }) => ($active ? "var(--teal-soft)" : "#fff")};
-  color: var(--ink);
-  font-weight: 800;
-  cursor: pointer;
-
-  input {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--teal);
-  }
-`;
-
-const AccessToolbar = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-
-  span {
-    color: var(--muted);
-    font-size: 0.86rem;
-    font-weight: 700;
-  }
-`;
-
-const AccessError = styled.p`
-  padding: 10px 12px;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  background: #fff1f2;
-  color: #b91c1c;
-  font-weight: 800;
-`;
-
-const CodeOverlay = styled.div`
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  place-items: center;
-  padding: 18px;
-  background: rgba(15, 23, 42, 0.55);
-`;
-
-const CodeModal = styled.div<{ $wide?: boolean }>`
-  display: grid;
-  gap: 12px;
-  width: min(${({ $wide }) => ($wide ? "640px" : "420px")}, 100%);
-  max-height: 90vh;
-  overflow: auto;
-  padding: 22px;
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-
-  h3 {
-    margin: 0;
-  }
-
-  p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 0.9rem;
-  }
-`;
-
-const CodeValue = styled.div<{ $inline?: boolean }>`
-  font-size: ${({ $inline }) => ($inline ? "1.2rem" : "2.2rem")};
-  font-weight: 900;
-  letter-spacing: 0.35em;
-  text-align: center;
-  padding: ${({ $inline }) => ($inline ? "0" : "12px")};
-  border: ${({ $inline }) => ($inline ? "none" : "1px dashed var(--teal)")};
-  border-radius: 8px;
-  background: ${({ $inline }) => ($inline ? "transparent" : "var(--teal-soft)")};
-`;

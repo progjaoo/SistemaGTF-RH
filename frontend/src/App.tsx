@@ -225,12 +225,12 @@ export default function App() {
             onSave={async (payload, id) => {
               await api.saveEmployee(session.token, payload, id);
               await loadWorkspace(session);
-              setNotice("Funcionário salvo.");
+              toast.success("Funcionário salvo.");
             }}
             onInactivate={async (id) => {
               await api.inactivateEmployee(session.token, id);
               await loadWorkspace(session);
-              setNotice("Funcionário inativado.");
+              toast.success("Funcionário inativado.");
             }}
             onReload={async () => {
               await loadWorkspace(session);
@@ -244,7 +244,7 @@ export default function App() {
             onSave={async (payload) => {
               await api.createMealPrice(session.token, payload);
               await loadWorkspace(session);
-              setNotice("Preço cadastrado.");
+              toast.success("Preço cadastrado.");
             }}
           />
         )}
@@ -257,19 +257,17 @@ export default function App() {
               setSelectedPeriodId(response.period.id);
               setActiveTab("records");
               await loadWorkspace(session, response.period.id);
-              setNotice("Período criado.");
+              toast.success("Período criado.");
             }}
             onClose={async (period) => {
               await api.closePeriod(session.token, period.id);
               await loadWorkspace(session);
-              setNotice("Período fechado.");
+              toast.success("Período fechado.");
             }}
             onReopen={async (period) => {
-              const confirmed = window.confirm("Tem certeza que deseja reabrir este período? Os lançamentos voltarão a ficar editáveis.");
-              if (!confirmed) return;
               await api.reopenPeriod(session.token, period.id);
               await loadWorkspace(session);
-              setNotice("Período reaberto. Os lançamentos voltaram a ficar editáveis.");
+              toast.success("Período reaberto. Os lançamentos voltaram a ficar editáveis.");
             }}
             onExport={(period) => api.downloadReport(session.token, period)}
             onReload={async () => {
@@ -283,7 +281,7 @@ export default function App() {
             onSave={async (payload, id) => {
               await api.saveUser(session.token, payload, id);
               await loadWorkspace(session);
-              setNotice("Usuário salvo.");
+              toast.success("Usuário salvo.");
             }}
           />
         )}

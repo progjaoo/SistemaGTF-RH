@@ -1,241 +1,112 @@
-import styled from "styled-components";
+import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
-export const Button = styled.button<{ $variant?: "solid" | "ghost" }>`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 8px 13px;
-  border: 1px solid ${({ $variant }) => ($variant === "ghost" ? "var(--line)" : "var(--teal)")};
-  border-radius: 8px;
-  background: ${({ $variant }) => ($variant === "ghost" ? "var(--surface)" : "var(--teal)")};
-  color: ${({ $variant }) => ($variant === "ghost" ? "var(--ink)" : "#fff")};
-  font-weight: 750;
-  white-space: nowrap;
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+export { Button } from "./button";
+export { Badge } from "./badge";
 
-  &:hover:not(:disabled) {
-    border-color: ${({ $variant }) => ($variant === "ghost" ? "rgba(15, 118, 110, 0.34)" : "#0b625b")};
-    background: ${({ $variant }) => ($variant === "ghost" ? "var(--teal-soft)" : "#0b625b")};
-    box-shadow: 0 8px 20px rgba(15, 118, 110, 0.14);
-  }
+export function IconButton({
+  children,
+  className,
+  ...props
+}: React.ComponentProps<"button">) {
+  return (
+    <button
+      type="button"
+      {...props}
+      className={cn(
+        "grid h-9 w-9 place-items-center rounded-lg border border-line bg-white text-ink transition-colors hover:bg-teal-bg hover:text-teal-deep disabled:cursor-not-allowed disabled:opacity-50",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
-  &:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
+export function Panel({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <section className={cn("min-w-0 rounded-lg border border-line bg-surface p-[18px] shadow-[0_18px_48px_rgb(32_38_44/0.08)] max-[520px]:p-[14px]", className)}>
+      {children}
+    </section>
+  );
+}
 
-  @media (max-width: 420px) {
-    white-space: normal;
-  }
-`;
+export function PanelHeader({ children }: { children: ReactNode }) {
+  return (
+    <div className="mb-[14px] flex items-center justify-between gap-3 max-[520px]:flex-col max-[520px]:items-start [&>div>h2]:m-0 [&>div>h2]:text-[1.05rem] [&>div>p]:mt-1 [&>div>p]:text-[0.9rem] [&>div>p]:text-muted [&>h2]:m-0 [&>h2]:text-[1.05rem]">
+      {children}
+    </div>
+  );
+}
 
-export const IconButton = styled.button`
-  display: inline-grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+export function TwoColumn({ children }: { children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[minmax(280px,380px)_minmax(0,1fr)] gap-[18px] max-[980px]:grid-cols-1 max-[520px]:gap-3">
+      {children}
+    </div>
+  );
+}
 
-  &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.1);
-  }
-`;
+export function DataTable({ children }: { children: ReactNode }) {
+  return (
+    <table className="w-full border-collapse max-[720px]:block max-[720px]:overflow-x-auto [&_td]:border-b [&_td]:border-line [&_td]:px-[10px] [&_td]:py-[11px] [&_td]:text-left [&_td]:align-middle [&_th]:border-b [&_th]:border-line [&_th]:px-[10px] [&_th]:py-[11px] [&_th]:text-left [&_th]:align-middle [&_th]:text-[0.78rem] [&_th]:uppercase [&_th]:text-muted max-[720px]:[&_tbody]:min-w-full max-[720px]:[&_td]:whitespace-nowrap max-[720px]:[&_thead]:min-w-full max-[720px]:[&_tr]:w-max max-[720px]:[&_tr]:min-w-full">
+      {children}
+    </table>
+  );
+}
 
-export const Panel = styled.section`
-  min-width: 0;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+export function FormGrid({ children, onSubmit }: { children: ReactNode; onSubmit: (event: React.FormEvent) => void }) {
+  return (
+    <form onSubmit={onSubmit} className="grid gap-3">
+      {children}
+    </form>
+  );
+}
 
-  @media (max-width: 520px) {
-    padding: 14px;
-  }
-`;
+export function Field({ children }: { children: ReactNode }) {
+  return (
+    <div className="grid gap-[6px] [&>label]:text-[0.82rem] [&>label]:font-bold [&>label]:text-muted [&>input]:min-h-10 [&>input]:w-full [&>input]:rounded-lg [&>input]:border [&>input]:border-line [&>input]:bg-white [&>input]:px-[10px] [&>input]:py-2 [&>input]:text-ink [&>input]:focus:border-teal [&>input]:focus:outline-none [&>select]:min-h-10 [&>select]:w-full [&>select]:rounded-lg [&>select]:border [&>select]:border-line [&>select]:bg-white [&>select]:px-[10px] [&>select]:py-2 [&>select]:text-ink [&>select]:focus:border-teal [&>select]:focus:outline-none [&>textarea]:rounded-lg [&>textarea]:border [&>textarea]:border-line [&>textarea]:bg-white [&>textarea]:p-[10px] [&>textarea]:focus:border-teal [&>textarea]:focus:outline-none">
+      {children}
+    </div>
+  );
+}
 
-export const PanelHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
+export function CheckboxLabel({ children }: { children: ReactNode }) {
+  return (
+    <label className="flex items-center gap-2 font-bold text-muted [&>input]:h-[18px] [&>input]:w-[18px] [&>input]:accent-teal-deep">
+      {children}
+    </label>
+  );
+}
 
-  h2 {
-    margin: 0;
-    font-size: 1.05rem;
-  }
+export function InlineActions({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap gap-2 max-[520px]:items-stretch max-[520px]:[&>button]:flex-[1_1_120px]">
+      {children}
+    </div>
+  );
+}
 
-  p {
-    margin: 4px 0 0;
-    color: var(--muted);
-    font-size: 0.9rem;
-  }
+export function Alert({ children }: { children: ReactNode }) {
+  return (
+    <div className="mb-[14px] flex items-center justify-between gap-[10px] rounded-lg border border-teal/25 bg-teal-bg p-[11px_12px] font-bold text-teal-deep max-[520px]:items-start max-[520px]:[&>span]:min-w-0 max-[520px]:[&>span]:wrap-anywhere">
+      {children}
+    </div>
+  );
+}
 
-  @media (max-width: 520px) {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-`;
+export function Loading({ children }: { children: ReactNode }) {
+  return <div className="mb-[14px] text-muted">{children}</div>;
+}
 
-export const TwoColumn = styled.div`
-  display: grid;
-  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
-  gap: 18px;
+export function EmptyState({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-lg border border-dashed border-line bg-white/70 p-7 text-muted">
+      {children}
+    </div>
+  );
+}
 
-  @media (max-width: 980px) {
-    grid-template-columns: 1fr;
-  }
-
-  @media (max-width: 520px) {
-    gap: 12px;
-  }
-`;
-
-export const DataTable = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-
-  th,
-  td {
-    padding: 11px 10px;
-    border-bottom: 1px solid var(--line);
-    text-align: left;
-    vertical-align: middle;
-  }
-
-  th {
-    color: var(--muted);
-    font-size: 0.78rem;
-    text-transform: uppercase;
-  }
-
-  @media (max-width: 720px) {
-    display: block;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-
-    thead,
-    tbody,
-    tr {
-      width: max-content;
-      min-width: 100%;
-    }
-
-    th,
-    td {
-      white-space: nowrap;
-    }
-  }
-`;
-
-export const FormGrid = styled.form`
-  display: grid;
-  gap: 12px;
-`;
-
-export const Field = styled.div`
-  display: grid;
-  gap: 6px;
-
-  label {
-    color: var(--muted);
-    font-size: 0.82rem;
-    font-weight: 750;
-  }
-
-  input,
-  select {
-    width: 100%;
-    min-height: 40px;
-    padding: 8px 10px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: #fff;
-    color: var(--ink);
-  }
-`;
-
-export const CheckboxLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-weight: 700;
-`;
-
-export const InlineActions = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-
-  @media (max-width: 520px) {
-    align-items: stretch;
-
-    ${Button} {
-      flex: 1 1 120px;
-    }
-  }
-`;
-
-export const Badge = styled.span<{ $tone: "good" | "warn" | "muted" }>`
-  display: inline-flex;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: ${({ $tone }) => ($tone === "good" ? "var(--teal-soft)" : $tone === "warn" ? "#fff2d8" : "#edf0f3")};
-  color: ${({ $tone }) => ($tone === "good" ? "var(--teal)" : $tone === "warn" ? "var(--amber)" : "var(--muted)")};
-  font-size: 0.78rem;
-  font-weight: 800;
-`;
-
-export const Alert = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 14px;
-  padding: 11px 12px;
-  border: 1px solid rgba(15, 118, 110, 0.25);
-  border-radius: 8px;
-  background: var(--teal-soft);
-  color: var(--teal);
-  font-weight: 750;
-
-  ${IconButton} {
-    color: var(--teal);
-    border-color: rgba(15, 118, 110, 0.25);
-  }
-
-  @media (max-width: 520px) {
-    align-items: flex-start;
-
-    span {
-      min-width: 0;
-      overflow-wrap: anywhere;
-    }
-  }
-`;
-
-export const Loading = styled.div`
-  margin-bottom: 14px;
-  color: var(--muted);
-`;
-
-export const EmptyState = styled.div`
-  padding: 28px;
-  border: 1px dashed var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
-  color: var(--muted);
-`;
-
-export const InlineError = styled.div`
-  color: #ffd1d1;
-  font-weight: 750;
-`;
+export function InlineError({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("font-bold text-danger", className)}>{children}</div>;
+}

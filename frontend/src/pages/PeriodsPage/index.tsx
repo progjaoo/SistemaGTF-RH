@@ -1,6 +1,17 @@
 import { FormEvent, useMemo, useState } from "react";
 import { CalendarPlus, Download, Plus, Undo2 } from "lucide-react";
-import { Badge, Button, DataTable, EmptyState, Field, FormGrid, InlineActions, Panel, PanelHeader, TwoColumn } from "../../components/ui";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { DataTable, EmptyState, Field, FormGrid, InlineActions, Panel, PanelHeader, TwoColumn } from "../../components/ui";
 import { api } from "../../api";
 import type { BillingPeriod } from "../../types";
 import { formatCurrency } from "../../utils/format";
@@ -54,14 +65,25 @@ export default function PeriodsPage({
         labelPrefix: yearForm.prefix.trim() || undefined
       });
       setYearMessage(`${result.periods.length} períodos de ${yearNum} criados.`);
+      toast.success(`${result.periods.length} períodos de ${yearNum} criados.`);
       await onReload();
     } catch (error) {
       // 409 (sobreposição): a API não cria nada; a mensagem orienta conferir a lista.
       const message = error instanceof Error ? error.message : "Não foi possível gerar o ano.";
       setYearMessage(`${message} Confira os períodos existentes na lista ao lado.`);
+      toast.error(message);
     } finally {
       setYearBusy(false);
     }
+  }
+
+  const [reopenTarget, setReopenTarget] = useState<BillingPeriod | null>(null);
+
+  async function confirmReopen() {
+    if (!reopenTarget) return;
+    const period = reopenTarget;
+    setReopenTarget(null);
+    await onReopen(period);
   }
 
   return (
@@ -107,7 +129,7 @@ export default function PeriodsPage({
             {periods.map((period) => (
               <tr key={period.id}>
                 <td>{period.label}</td>
-                <td><Badge $tone={period.status === "OPEN" ? "warn" : "good"}>{period.status === "OPEN" ? "Aberto" : "Fechado"}</Badge></td>
+                <td><Badge variant={period.status === "OPEN" ? "warn" : "good"}>{period.status === "OPEN" ? "Aberto" : "Fechado"}</Badge></td>
                 <td>{formatCurrency(period.totalAmount)}</td>
                 <td>
                   <InlineActions>
@@ -115,11 +137,11 @@ export default function PeriodsPage({
                       <Download size={16} />
                       Excel
                     </Button>
-                    <Button type="button" $variant="ghost" disabled={period.status === "CLOSED"} onClick={() => onClose(period)}>
+                    <Button type="button" variant="outline" disabled={period.status === "CLOSED"} onClick={() => onClose(period)}>
                       Fechar
                     </Button>
                     {period.status === "CLOSED" && (
-                      <Button type="button" $variant="ghost" onClick={() => onReopen(period)}>
+                      <Button type="button" variant="outline" onClick={() => setReopenTarget(period)}>
                         <Undo2 size={16} />
                         Reabrir período
                       </Button>
@@ -200,6 +222,25 @@ export default function PeriodsPage({
         </DataTable>
       )}
     </Panel>
+
+    <Dialog open={reopenTarget !== null} onOpenChange={(open) => { if (!open) setReopenTarget(null); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reabrir período</DialogTitle>
+          <DialogDescription>
+            Tem certeza que deseja reabrir <strong>{reopenTarget?.label}</strong>? Os lançamentos voltarão a ficar editáveis.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setReopenTarget(null)}>
+            Cancelar
+          </Button>
+          <Button type="button" variant="danger" onClick={() => void confirmReopen()}>
+            Reabrir período
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }
