@@ -44,7 +44,24 @@ export default function EmployeePortalPage() {
   const [searchError, setSearchError] = useState("");
   const [codeError, setCodeError] = useState("");
   const [calendarError, setCalendarError] = useState("");
+  const [installEvent, setInstallEvent] = useState<Event | null>(null);
   const currentMonth = useMemo(() => monthKeyInSaoPaulo(), []);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      event.preventDefault();
+      setInstallEvent(event);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  async function installApp() {
+    const evt = installEvent as unknown as { prompt: () => Promise<void> } | null;
+    if (!evt) return;
+    await evt.prompt();
+    setInstallEvent(null);
+  }
 
   function clearSession() {
     for (const store of [localStorage, sessionStorage]) {
@@ -176,10 +193,19 @@ export default function EmployeePortalPage() {
     <main className="grid min-h-[100dvh] content-start justify-items-center gap-5 bg-paper bg-[linear-gradient(90deg,rgb(43_168_162/0.08)_0_1px,transparent_1px_100%)] bg-[length:42px_42px] p-[clamp(18px,5vw,42px)]">
       <header className="flex w-[min(760px,100%)] items-center gap-[14px] text-ink">
         <BrandLogo src={logoGtf} alt="Grupo GTF" className="h-[54px] w-[92px]" />
-        <div>
+        <div className="flex-1">
           <strong className="block text-[1.05rem]">GTF - Recursos Humanos</strong>
           <span className="block font-bold text-muted">Controle de Almoços</span>
         </div>
+        {installEvent && (
+          <button
+            type="button"
+            onClick={() => void installApp()}
+            className="min-h-[38px] rounded-lg bg-teal-ink px-3 py-2 text-[0.85rem] font-extrabold text-white"
+          >
+            Instalar app
+          </button>
+        )}
       </header>
 
       {step === "search" && (

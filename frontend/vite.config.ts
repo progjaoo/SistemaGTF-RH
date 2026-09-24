@@ -1,10 +1,42 @@
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vite";
 
+const basePath = process.env.VITE_BASE_PATH ?? "/";
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA({
+      registerType: "prompt",
+      manifest: {
+        name: "GTF - Controle de Almoços",
+        short_name: "GTF Almoço",
+        start_url: `${basePath}colaborador/`,
+        scope: `${basePath}colaborador/`,
+        display: "standalone",
+        background_color: "#EFF8F7",
+        theme_color: "#1E8C86",
+        icons: [
+          { src: "pwa-192.png", sizes: "192x192", type: "image/png" },
+          { src: "pwa-512.png", sizes: "512x512", type: "image/png" },
+          { src: "maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+        ]
+      },
+      workbox: {
+        // API nunca cacheada: só documentos do portal.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.includes("/api/"),
+            handler: "NetworkOnly"
+          }
+        ]
+      }
+    })
+  ],
   resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
   base: process.env.VITE_BASE_PATH ?? "/",
   build: {
