@@ -134,7 +134,7 @@ export default function App() {
   ] satisfies NavigationTab[]).filter((tab) => !tab.rhOnly || isRh);
 
   return (
-    <Shell $collapsed={sidebarCollapsed}>
+    <Shell collapsed={sidebarCollapsed}>
       <Toaster position="top-center" />
       <Sidebar
         tabs={tabs}
@@ -150,7 +150,7 @@ export default function App() {
         <Topbar>
           <div>
             <Eyebrow>{selectedPeriod ? `${fullDate(selectedPeriod.startDate)} a ${fullDate(selectedPeriod.endDate)}` : "Sem período"}</Eyebrow>
-            <h1>{selectedPeriod?.label ?? "Sistema RH - Grupo GTF"}</h1>
+            <h1 className="mt-1 text-[clamp(1.4rem,2.4vw,2.4rem)] max-[820px]:text-[1.35rem] max-[820px]:leading-[1.15] max-[820px]:wrap-anywhere">{selectedPeriod?.label ?? "Sistema RH - Grupo GTF"}</h1>
           </div>
           <Toolbar>
             <select value={selectedPeriodId} onChange={(event) => setSelectedPeriodId(event.target.value)}>

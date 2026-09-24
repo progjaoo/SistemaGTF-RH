@@ -165,7 +165,7 @@ export default function EmployeePortalPage() {
   return (
     <PortalLayout>
       <PortalHeader>
-        <BrandLogo src={logoGtf} alt="Grupo GTF" />
+        <BrandLogo src={logoGtf} alt="Grupo GTF" className="h-[54px] w-[92px]" />
         <div>
           <strong>GTF - Recursos Humanos</strong>
           <span>Controle de Almoços</span>
@@ -237,11 +237,6 @@ const PortalHeader = styled.header`
   gap: 14px;
   width: min(760px, 100%);
   color: var(--ink);
-
-  ${BrandLogo} {
-    width: 92px;
-    height: 54px;
-  }
 
   strong,
   span {

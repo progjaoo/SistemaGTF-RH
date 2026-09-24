@@ -1,57 +1,25 @@
-import styled from "styled-components";
+export function Brand({ children }: { children: React.ReactNode }) {
+  return <div className="flex min-w-0 items-center justify-start gap-3">{children}</div>;
+}
 
-export const Brand = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
-  min-width: 0;
+export function BrandLogo({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`block h-[58px] w-[120px] max-w-full object-contain transition-[width,height] ${className ?? ""}`}
+    />
+  );
+}
 
-  strong {
-    display: block;
-    font-size: 1rem;
-  }
+export function BrandText({ children }: { children: React.ReactNode }) {
+  return <div className="min-w-0 overflow-hidden whitespace-nowrap">{children}</div>;
+}
 
-  span {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.86rem;
-  }
-
-  @media (max-width: 900px) {
-    justify-content: flex-start;
-    gap: 12px;
-  }
-`;
-
-export const BrandLogo = styled.img`
-  display: block;
-  width: 120px;
-  max-width: 100%;
-  height: 58px;
-  object-fit: contain;
-  border-radius: 0;
-  transition: width 0.22s ease, height 0.22s ease;
-
-  @media (max-width: 900px) {
-    width: 76px;
-    height: 58px;
-  }
-`;
-
-export const BrandText = styled.div`
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-`;
-
-export const BrandMark = styled.div`
-  display: grid;
-  width: 48px;
-  height: 48px;
-  place-items: center;
-  border-radius: 8px;
-  background: var(--teal);
-  color: #fff;
-  font-weight: 900;
-  letter-spacing: 0;
-`;
+export function BrandMark({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid h-12 w-12 place-items-center rounded-lg bg-teal font-black text-white">
+      {children}
+    </div>
+  );
+}
