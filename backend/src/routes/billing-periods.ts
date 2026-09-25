@@ -233,7 +233,9 @@ billingPeriodsRouter.get("/:id/report", asyncHandler(async (req, res) => {
 
   sheet.columns = [
     { header: "Funcionario", key: "employeeName", width: 30 },
-    { header: "Quantidade", key: "quantity", width: 14 },
+    { header: "Quantidade (pegou)", key: "quantity", width: 18 },
+    { header: "Não pegou (dias)", key: "notTaken", width: 16 },
+    { header: "Pendente (dias)", key: "pending", width: 16 },
     { header: "Preco(s) aplicado(s)", key: "unitPrices", width: 22 },
     { header: "Valor a descontar", key: "amount", width: 20 }
   ];
@@ -241,6 +243,8 @@ billingPeriodsRouter.get("/:id/report", asyncHandler(async (req, res) => {
   sheet.addRows(summary.employeeTotals.map((item) => ({
     employeeName: item.employeeName,
     quantity: item.quantity,
+    notTaken: item.notTaken,
+    pending: item.pending,
     unitPrices: item.unitPrices.map((price) => `R$ ${price.toFixed(2)}`).join(", "),
     amount: item.amount
   })));

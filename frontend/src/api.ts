@@ -130,6 +130,12 @@ export const api = {
     if (date) params.set("date", date);
     return request<{ confirmations: MealRecordConfirmation[] }>(`/meal-records/confirmations?${params.toString()}`, token);
   },
+  setConfirmation(token: string, payload: { employeeId: string; date: string; status: "PEGUEI" | "NAO_PEGUEI"; note?: string }) {
+    return request<{ confirmation: MealRecordConfirmation }>("/meal-records/confirmations", token, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
   employeePortalSearch(name: string) {
     return request<{ employees: EmployeePortalSearchResult[] }>(`/employee-portal/search?name=${encodeURIComponent(name)}`);
   },

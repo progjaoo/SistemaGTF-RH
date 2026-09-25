@@ -24,7 +24,7 @@ beforeAll(async () => {
   const price = await createPrice(10, "2020-09-01");
   ids.priceIds.push(price.id);
   await prisma.mealRecord.create({
-    data: { employeeId: emp.id, periodId, date: d("2020-09-02"), quantity: 2, registeredById: rh.id }
+    data: { employeeId: emp.id, periodId, date: d("2020-09-02"), quantity: 2, confirmationStatus: "PEGUEI", registeredById: rh.id }
   });
 });
 

@@ -240,7 +240,7 @@ export default function RecordsPage({
 
         <InfoCard>
           <Info size={18} />
-          <span>Informe a quantidade de refeições para cada colaborador neste dia.</span>
+          <span>A quantidade é ajuste da gestora — no fechamento vale a confirmação (Peguei). Marque o WhatsApp na conferência.</span>
         </InfoCard>
 
         <DailyTotalCard>
@@ -334,6 +334,7 @@ export default function RecordsPage({
                   <th>Status</th>
                   <th>Origem</th>
                   <th>Observação</th>
+                  <th>Marcar</th>
                 </tr>
               </thead>
               <tbody>
@@ -349,6 +350,16 @@ export default function RecordsPage({
                     </td>
                     <td>{confirmation.confirmationSource === "SISTEMA" ? "Sistema" : confirmation.confirmationSource === "WHATSAPP" ? "WhatsApp" : "Sem confirmação"}</td>
                     <td>{confirmation.confirmationNote ?? "—"}</td>
+                    <td>
+                      <div className="flex gap-1">
+                        <Button type="button" size="xs" title="Marcar pegou (WhatsApp)" disabled={readOnly} onClick={async () => { await api.setConfirmation(token, { employeeId: confirmation.employeeId, date: confirmation.date, status: "PEGUEI" }); await loadConfirmations(confirmationScope ?? "DAY"); }}>
+                          Pegou
+                        </Button>
+                        <Button type="button" size="xs" variant="outline" title="Marcar não pegou (WhatsApp)" disabled={readOnly} onClick={async () => { await api.setConfirmation(token, { employeeId: confirmation.employeeId, date: confirmation.date, status: "NAO_PEGUEI" }); await loadConfirmations(confirmationScope ?? "DAY"); }}>
+                          Não
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

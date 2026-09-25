@@ -22,33 +22,37 @@ export function buildPeriodPdf(summary: PeriodSummary): Promise<Buffer> {
     );
     doc.moveDown();
 
-    // Colunas: nome | qtd | preços | valor (largura útil A4 ≈ 500pt).
-    const x = { name: 48, qty: 330, prices: 390, amount: 470 };
-    const row = (name: string, qty: string, prices: string, amount: string, bold: boolean) => {
+    // Colunas: nome | pegou | não pegou | pendente | preços | valor (largura útil A4 ≈ 500pt).
+    const x = { name: 48, qty: 238, notTaken: 288, pending: 348, prices: 408, amount: 478 };
+    const row = (name: string, qty: string, notTaken: string, pending: string, prices: string, amount: string, bold: boolean) => {
       if (doc.y > 730) doc.addPage();
       doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(10).fillColor("#111827");
-      doc.text(name, x.name, doc.y, { width: 270 });
+      doc.text(name, x.name, doc.y, { width: 180 });
       const y = doc.y - 12;
-      doc.text(qty, x.qty, y, { width: 50, align: "right" });
-      doc.text(prices, x.prices, y, { width: 75 });
-      doc.text(amount, x.amount, y, { width: 78, align: "right" });
+      doc.text(qty, x.qty, y, { width: 42, align: "right" });
+      doc.text(notTaken, x.notTaken, y, { width: 52, align: "right" });
+      doc.text(pending, x.pending, y, { width: 52, align: "right" });
+      doc.text(prices, x.prices, y, { width: 62 });
+      doc.text(amount, x.amount, y, { width: 69, align: "right" });
       doc.moveDown(0.6);
       doc.moveTo(48, doc.y).lineTo(547, doc.y).strokeColor("#e5e7eb").stroke();
       doc.moveDown(0.6);
     };
 
-    row("Funcionário", "Qtd", "Preço(s)", "Valor", true);
+    row("Funcionário", "Pegou", "Não pegou", "Pendente", "Preço(s)", "Valor", true);
     for (const item of summary.employeeTotals) {
       row(
         item.employeeName,
         String(item.quantity),
+        String(item.notTaken),
+        String(item.pending),
         item.unitPrices.map((price) => brl(price)).join(", "),
         brl(item.amount),
         false
       );
     }
     doc.moveDown(0.5);
-    row("Total geral", String(summary.totalQuantity), "", brl(summary.totalAmount), true);
+    row("Total geral", String(summary.totalQuantity), "", "", "", brl(summary.totalAmount), true);
 
     doc.end();
   });

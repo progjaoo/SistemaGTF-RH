@@ -496,6 +496,45 @@ export const openApiDocument = {
           },
           "422": { $ref: "#/components/responses/ValidationError" }
         }
+      },
+      post: {
+        tags: ["Meal Records"],
+        summary: "Marca confirmação manual (WhatsApp) — RH/gestora",
+        description: "Cria o registro com qtd 1 se não existir, ou sobrescreve a confirmação existente. Origem WHATSAPP. Período precisa estar OPEN.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["employeeId", "date", "status"],
+                properties: {
+                  employeeId: { type: "string", format: "uuid" },
+                  date: { type: "string", format: "date", example: "2026-07-03" },
+                  status: { type: "string", enum: ["PEGUEI", "NAO_PEGUEI"] },
+                  note: { type: "string", maxLength: 500 }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Confirmação registrada",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    confirmation: { $ref: "#/components/schemas/MealRecordConfirmation" }
+                  }
+                }
+              }
+            }
+          },
+          "422": { $ref: "#/components/responses/ValidationError" }
+        }
       }
     },
     "/employee-portal/login": {

@@ -1,4 +1,4 @@
-import { BillingStatus, Prisma } from "@prisma/client";
+import { BillingStatus, EmployeeStatus, Prisma } from "@prisma/client";
 import express from "express";
 import { z } from "zod";
 import { formatDate, isBetween, parseDate } from "../lib/dates.js";
@@ -6,7 +6,8 @@ import { normalizeSearch } from "../lib/names.js";
 import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { authenticate, type AuthenticatedRequest } from "../middleware/auth.js";
-import { assertNoFutureDates, isFutureDate } from "../services/date-rules.js";
+import { emitMealConfirmationUpdated } from "../realtime.js";
+import { assertNoFutureDates, formatDateKeyInSaoPaulo, isFutureDate } from "../services/date-rules.js";
 import { applyMealEntry, type MealEntryWarning } from "../services/meal-entries.js";
 
 export const mealRecordsRouter = express.Router();
@@ -115,6 +116,93 @@ mealRecordsRouter.get("/confirmations", asyncHandler(async (req, res) => {
     });
 
   res.json({ confirmations });
+}));
+
+const confirmationSetSchema = z.object({
+  employeeId: z.string(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato YYYY-MM-DD."),
+  status: z.enum(["PEGUEI", "NAO_PEGUEI"]),
+  note: z.string().trim().max(500).optional()
+});
+
+// Marcação manual RH/gestora (WhatsApp): cria o registro com qtd 1 se não
+// existir, ou sobrescreve a confirmação (gestora corrige; auditoria registra
+// o ator). Período precisa estar OPEN. Emite realtime para a conferência.
+mealRecordsRouter.post("/confirmations", asyncHandler(async (req, res) => {
+  const actor = (req as AuthenticatedRequest).user;
+  const input = confirmationSetSchema.parse(req.body);
+  const date = parseDate(input.date);
+
+  if (isFutureDate(date)) {
+    return res.status(422).json({ message: "Não é possível marcar data futura." });
+  }
+
+  const employee = await prisma.employee.findFirst({
+    where: { id: input.employeeId, status: EmployeeStatus.ACTIVE }
+  });
+  if (!employee) return res.status(404).json({ message: "Funcionário não encontrado." });
+
+  const period = await prisma.billingPeriod.findFirst({
+    where: { status: BillingStatus.OPEN, startDate: { lte: date }, endDate: { gte: date } }
+  });
+  if (!period) return res.status(422).json({ message: "Nenhum período aberto para esta data." });
+  if (formatDate(date) < formatDateKeyInSaoPaulo() && !input.note?.trim()) {
+    return res.status(422).json({ message: "Justificativa obrigatória para marcação atrasada." });
+  }
+  const note = input.note?.trim() ? input.note.trim() : null;
+
+  const existing = await prisma.mealRecord.findUnique({
+    where: { employeeId_date: { employeeId: employee.id, date } }
+  });
+
+  const record = existing
+    ? await prisma.mealRecord.update({
+        where: { id: existing.id },
+        data: {
+          confirmationStatus: input.status,
+          confirmationSource: "WHATSAPP",
+          confirmationNote: note,
+          confirmedAt: new Date(),
+          periodId: period.id
+        }
+      })
+    : await prisma.mealRecord.create({
+        data: {
+          employeeId: employee.id,
+          periodId: period.id,
+          date,
+          quantity: 1,
+          confirmationStatus: input.status,
+          confirmationSource: "WHATSAPP",
+          confirmationNote: note,
+          confirmedAt: new Date(),
+          registeredById: actor.id
+        }
+      });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: actor.id,
+      entity: "MealRecord",
+      entityId: record.id,
+      action: "MANUAL_CONFIRMATION",
+      metadata: { employeeId: employee.id, date: input.date, status: input.status, source: "WHATSAPP", created: !existing }
+    }
+  });
+
+  const confirmation = {
+    employeeId: employee.id,
+    employeeName: employee.name,
+    date: input.date,
+    quantity: record.quantity,
+    confirmationStatus: input.status,
+    confirmationSource: "WHATSAPP" as const,
+    confirmationNote: note,
+    confirmedAt: record.confirmedAt?.toISOString() ?? null
+  };
+  emitMealConfirmationUpdated({ periodId: period.id, confirmation });
+
+  res.json({ confirmation });
 }));
 
 mealRecordsRouter.post("/bulk", asyncHandler(async (req, res) => {

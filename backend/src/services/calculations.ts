@@ -41,6 +41,9 @@ export async function calculatePeriodSummary(periodId: string) {
     quantity: number;
     amount: number;
     unitPrices: Set<number>;
+    taken: number;
+    notTaken: number;
+    pending: number;
   }>();
   const dailyMap = new Map<string, { date: string; quantity: number; amount: number }>();
 
@@ -50,10 +53,13 @@ export async function calculatePeriodSummary(periodId: string) {
   for (const record of records as RecordWithEmployee[]) {
     const price = resolveMealPrice(prices, record.employeeId, record.date);
     const unitPrice = price ? Number(price.value) : 0;
-    const amount = unitPrice * record.quantity;
+    // PLAN-005: o colaborador rege — só PEGUEI é faturável.
+    const billable = record.confirmationStatus === "PEGUEI";
+    const quantity = billable ? record.quantity : 0;
+    const amount = unitPrice * quantity;
     const dateKey = formatDate(record.date);
 
-    totalQuantity += record.quantity;
+    totalQuantity += quantity;
     totalAmount += amount;
 
     const employeeTotal = employeeMap.get(record.employeeId) ?? {
@@ -61,15 +67,21 @@ export async function calculatePeriodSummary(periodId: string) {
       employeeName: record.employee.name,
       quantity: 0,
       amount: 0,
-      unitPrices: new Set<number>()
+      unitPrices: new Set<number>(),
+      taken: 0,
+      notTaken: 0,
+      pending: 0
     };
-    employeeTotal.quantity += record.quantity;
+    employeeTotal.quantity += quantity;
     employeeTotal.amount += amount;
     employeeTotal.unitPrices.add(unitPrice);
+    if (record.confirmationStatus === "PEGUEI") employeeTotal.taken += 1;
+    else if (record.confirmationStatus === "NAO_PEGUEI") employeeTotal.notTaken += 1;
+    else employeeTotal.pending += 1;
     employeeMap.set(record.employeeId, employeeTotal);
 
     const dailyTotal = dailyMap.get(dateKey) ?? { date: dateKey, quantity: 0, amount: 0 };
-    dailyTotal.quantity += record.quantity;
+    dailyTotal.quantity += quantity;
     dailyTotal.amount += amount;
     dailyMap.set(dateKey, dailyTotal);
   }
@@ -84,7 +96,10 @@ export async function calculatePeriodSummary(periodId: string) {
         employeeName: item.employeeName,
         quantity: item.quantity,
         amount: roundCurrency(item.amount),
-        unitPrices: [...item.unitPrices].sort((a, b) => a - b)
+        unitPrices: [...item.unitPrices].sort((a, b) => a - b),
+        taken: item.taken,
+        notTaken: item.notTaken,
+        pending: item.pending
       }))
       .sort((a, b) => b.quantity - a.quantity || a.employeeName.localeCompare(b.employeeName)),
     dailyTrend: [...dailyMap.values()].map((item) => ({
