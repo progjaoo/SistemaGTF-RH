@@ -240,6 +240,7 @@ export default function EmployeePortalPage() {
       {step === "calendar" && selectedEmployee && (
         <EmployeeCalendar
           employee={selectedEmployee}
+          portalToken={portalToken}
           month={month}
           currentMonth={currentMonth}
           days={days}

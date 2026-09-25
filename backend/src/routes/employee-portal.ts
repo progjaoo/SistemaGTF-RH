@@ -218,6 +218,37 @@ employeePortalRouter.get("/:employeeId/calendar", authenticatePortal, asyncHandl
   });
 }));
 
+const pushSubscriptionSchema = z.object({
+  endpoint: z.string().url(),
+  keys: z.object({ p256dh: z.string().min(1), auth: z.string().min(1) })
+});
+
+employeePortalRouter.get("/:employeeId/push/vapid-key", authenticatePortal, asyncHandler(async (req, res) => {
+  const portalEmployee = (req as PortalRequest).portalEmployee;
+  if (portalEmployee.id !== req.params.employeeId) return res.status(403).json({ message: "Sessão de outro colaborador." });
+  res.json({ publicKey: config.vapidPublicKey });
+}));
+
+employeePortalRouter.post("/:employeeId/push/subscriptions", authenticatePortal, asyncHandler(async (req, res) => {
+  const portalEmployee = (req as PortalRequest).portalEmployee;
+  if (portalEmployee.id !== req.params.employeeId) return res.status(403).json({ message: "Sessão de outro colaborador." });
+  const input = pushSubscriptionSchema.parse(req.body);
+  const sub = await prisma.pushSubscription.upsert({
+    where: { endpoint: input.endpoint },
+    update: { employeeId: portalEmployee.id, p256dh: input.keys.p256dh, auth: input.keys.auth },
+    create: { employeeId: portalEmployee.id, endpoint: input.endpoint, p256dh: input.keys.p256dh, auth: input.keys.auth }
+  });
+  res.status(201).json({ subscription: { id: sub.id, endpoint: sub.endpoint } });
+}));
+
+employeePortalRouter.delete("/:employeeId/push/subscriptions", authenticatePortal, asyncHandler(async (req, res) => {
+  const portalEmployee = (req as PortalRequest).portalEmployee;
+  if (portalEmployee.id !== req.params.employeeId) return res.status(403).json({ message: "Sessão de outro colaborador." });
+  const { endpoint } = z.object({ endpoint: z.string().url() }).parse(req.body);
+  await prisma.pushSubscription.deleteMany({ where: { endpoint, employeeId: portalEmployee.id } });
+  res.json({ ok: true });
+}));
+
 employeePortalRouter.post("/:employeeId/checkin", authenticatePortal, asyncHandler(async (req, res) => {
   const portalEmployee = (req as PortalRequest).portalEmployee;
   if (portalEmployee.id !== req.params.employeeId) {

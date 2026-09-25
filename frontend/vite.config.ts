@@ -11,6 +11,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       registerType: "prompt",
       manifest: {
         name: "GTF - Controle de Almoços",
@@ -34,7 +37,8 @@ export default defineConfig({
             handler: "NetworkOnly"
           }
         ]
-      }
+      },
+      injectManifest: { globPatterns: ["**/*.{js,css,html,ico,png,webmanifest}"] }
     })
   ],
   resolve: { alias: { "@": path.resolve(__dirname, "./src") } },

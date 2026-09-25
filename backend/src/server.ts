@@ -17,6 +17,7 @@ import { mealPricesRouter } from "./routes/meal-prices.js";
 import { mealRecordsRouter } from "./routes/meal-records.js";
 import { usersRouter } from "./routes/users.js";
 import { initRealtime } from "./realtime.js";
+import { startLunchReminderScheduler } from "./services/push.js";
 
 const app = express();
 
@@ -117,4 +118,7 @@ if (isDirectRun) {
       console.error("Realtime indisponível:", error);
     });
   });
+  if (process.env.NODE_ENV !== "test") {
+    startLunchReminderScheduler();
+  }
 }

@@ -98,7 +98,10 @@ Rotas:
 - `GET /employee-portal/search?name=...` — pública com rate-limit; retorna `id`, `name` e `hasAccess`
 - `POST /employee-portal/login` — pública com rate-limit estrito (10/min); corpo `{ employeeId, code, remember? }`; retorna `{ token, employee, portalStatus: "active" }`; com `remember: true`, token de 30d (manter conectado), senão 8h; o primeiro login preenche a ativação (auditoria `PORTAL_ACTIVATED`)
 - `GET /employee-portal/:employeeId/calendar?month=YYYY-MM` — exige token do próprio funcionário
-- `POST /employee-portal/:employeeId/checkin` — exige token do próprio funcionário
+- `POST /employee-portal/:employeeId/checkin` — exige token do próprio funcionário; sem lançamento do RH, cria o registro (qtd 1) no período OPEN (self check-in)
+- `GET /employee-portal/:employeeId/push/vapid-key` — chave pública VAPID para assinar o push
+- `POST /employee-portal/:employeeId/push/subscriptions` — corpo `{ endpoint, keys: { p256dh, auth } }`; idempotente por `endpoint`
+- `DELETE /employee-portal/:employeeId/push/subscriptions` — corpo `{ endpoint }`; remove a inscrição
 
 Regras:
 
@@ -111,6 +114,7 @@ Regras:
 - Não é possível confirmar lançamento de período fechado.
 - A confirmação pelo portal grava `confirmationSource = SISTEMA`.
 - Após salvar o check-in, a API emite o evento realtime `meal-confirmation:updated` para a sala do período.
+- **Lembrete push 14:30**: todo dia às 14:30 (America/Sao_Paulo) a API envia Web Push (`Hora do almoço 🍽️`, com som e vibração padrão) para todas as inscrições ativas — **somente se houver período OPEN cobrindo o dia**. Toque abre `/colaborador/`. Inscrições mortas (410/404) são removidas automaticamente. Chaves via `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_CONTACT`.
 
 Payload de check-in:
 

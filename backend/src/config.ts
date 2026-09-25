@@ -25,5 +25,8 @@ export const config = {
   port: Number(process.env.PORT ?? 3333),
   jwtSecret: process.env.JWT_SECRET ?? "dev-secret-change-me",
   corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? "",
+  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
+  vapidContact: process.env.VAPID_CONTACT ?? "mailto:rh@grupogtf.com.br",
   databaseUrl
 };

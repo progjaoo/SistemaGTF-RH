@@ -130,6 +130,21 @@ export const api = {
     if (date) params.set("date", date);
     return request<{ confirmations: MealRecordConfirmation[] }>(`/meal-records/confirmations?${params.toString()}`, token);
   },
+  pushVapidKey(token: string, employeeId: string) {
+    return request<{ publicKey: string }>(`/employee-portal/${employeeId}/push/vapid-key`, token);
+  },
+  pushSubscribe(token: string, employeeId: string, payload: { endpoint: string; keys: { p256dh: string; auth: string } }) {
+    return request<{ subscription: { id: string; endpoint: string } }>(`/employee-portal/${employeeId}/push/subscriptions`, token, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+  pushUnsubscribe(token: string, employeeId: string, endpoint: string) {
+    return request<{ ok: boolean }>(`/employee-portal/${employeeId}/push/subscriptions`, token, {
+      method: "DELETE",
+      body: JSON.stringify({ endpoint })
+    });
+  },
   setConfirmation(token: string, payload: { employeeId: string; date: string; status: "PEGUEI" | "NAO_PEGUEI"; note?: string }) {
     return request<{ confirmation: MealRecordConfirmation }>("/meal-records/confirmations", token, {
       method: "POST",

@@ -4,9 +4,12 @@ import { DayPicker, type DayButtonProps } from "react-day-picker";
 import "react-day-picker/style.css";
 import { ptBR } from "date-fns/locale";
 import type { ConfirmationStatus, EmployeePortalDay, EmployeePortalSearchResult } from "../../types";
+import { api } from "../../api";
 import { dateKeyInSaoPaulo } from "../../utils/date";
+import { subscribeForLunchReminders } from "../../utils/push";
 import { cn } from "@/lib/utils";
 import { DayCheckin } from "./DayCheckin";
+import { PushReminderToggle } from "./PushReminderToggle";
 
 function parseKey(key: string) {
   const [year, month, day] = key.split("-").map(Number);
@@ -37,6 +40,7 @@ function LaunchDayButton(props: DayButtonProps) {
 
 export function EmployeeCalendar({
   employee,
+  portalToken,
   month,
   currentMonth,
   days,
@@ -48,6 +52,7 @@ export function EmployeeCalendar({
   onBack
 }: {
   employee: EmployeePortalSearchResult;
+  portalToken: string;
   month: string;
   currentMonth: string;
   days: EmployeePortalDay[];
@@ -64,6 +69,19 @@ export function EmployeeCalendar({
   useEffect(() => {
     setSelectedKey(null);
   }, [month, employee.id]);
+
+  useEffect(() => {
+    const handler = () => { void (async () => {
+      try {
+        if (Notification.permission !== "default") return;
+        const { publicKey } = await api.pushVapidKey(portalToken, employee.id);
+        const json = await subscribeForLunchReminders(publicKey);
+        await api.pushSubscribe(portalToken, employee.id, json);
+      } catch { /* silencioso: o botão cobre */ }
+    })(); };
+    window.addEventListener("appinstalled", handler);
+    return () => window.removeEventListener("appinstalled", handler);
+  }, [employee.id, portalToken]);
 
   const byDate = useMemo(() => new Map(days.map((day) => [day.date, day])), [days]);
 
@@ -104,6 +122,7 @@ export function EmployeeCalendar({
           Trocar nome
         </button>
       </div>
+      <PushReminderToggle employeeId={employee.id} portalToken={portalToken} />
 
       {error && <div className="rounded-lg border border-danger/30 bg-danger/5 px-[10px] py-[10px] font-extrabold text-danger-ink">{error}</div>}
 
