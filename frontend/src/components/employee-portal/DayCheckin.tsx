@@ -10,11 +10,13 @@ import { cn } from "@/lib/utils";
 // confirmado/fechado são só leitura.
 export function DayCheckin({
   day,
+  selectedDate,
   today,
   saving,
   onCheckin
 }: {
   day: EmployeePortalDay | undefined;
+  selectedDate?: string | null;
   today: string;
   saving: boolean;
   onCheckin: (date: string, status: Exclude<ConfirmationStatus, "PENDING">, note?: string) => void;
@@ -26,9 +28,18 @@ export function DayCheckin({
   }, [day?.id]);
 
   if (!day) {
+    if (selectedDate) {
+      return (
+        <div className="rounded-lg border border-dashed border-line bg-white/70 p-7 text-muted">
+          Nenhum almoço lançado para {fullDate(selectedDate)}.
+          {selectedDate === today ? " O RH ainda não lançou o almoço de hoje." : ""}
+          {" "}Se você trabalhou neste dia, fale com o RH.
+        </div>
+      );
+    }
     return (
       <div className="rounded-lg border border-dashed border-line bg-white/70 p-7 text-muted">
-        Toque em um dia com almoço lançado para confirmar.
+        Toque em um dia marcado com ponto para confirmar.
       </div>
     );
   }

@@ -142,6 +142,7 @@ export function EmployeeCalendar({
           </div>
           <DayCheckin
             day={selectedDay}
+            selectedDate={selectedKey}
             today={today}
             saving={selectedDay ? savingDate === selectedDay.date : false}
             onCheckin={onCheckin}
