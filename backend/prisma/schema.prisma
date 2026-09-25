@@ -103,8 +103,10 @@ model MealRecord {
   // Justificativa/observação do colaborador (obrigatória em marcação
   // atrasada, opcional no dia). Exibida à gestora na conferência.
   confirmationNote   String?             @db.VarChar(500)
-  registeredById     String              @db.Uuid
-  registeredBy       User                @relation("RegisteredBy", fields: [registeredById], references: [id])
+  // Nulo quando o lançamento foi criado pelo próprio colaborador via
+  // portal (self check-in) — não há usuário RH/gestora responsável.
+  registeredById     String?             @db.Uuid
+  registeredBy       User?               @relation("RegisteredBy", fields: [registeredById], references: [id])
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 

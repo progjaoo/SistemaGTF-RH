@@ -130,7 +130,7 @@ export const openApiDocument = {
           confirmationStatus: { type: "string", enum: ["PENDING", "PEGUEI", "NAO_PEGUEI"], default: "PENDING" },
           confirmationSource: { type: "string", enum: ["SISTEMA", "WHATSAPP"], nullable: true },
           confirmedAt: { type: "string", format: "date-time", nullable: true },
-          registeredById: { type: "string", format: "uuid" }
+          registeredById: { type: "string", format: "uuid", nullable: true }
         }
       },
       MealRecordBulkInput: {

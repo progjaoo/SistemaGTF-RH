@@ -243,8 +243,96 @@ employeePortalRouter.post("/:employeeId/checkin", authenticatePortal, asyncHandl
     include: { period: true }
   });
 
+  const isLate = formatDate(date) < formatDateKeyInSaoPaulo();
+  const note = input.note?.trim() ? input.note.trim() : null;
+  if (isLate && !note) {
+    return res.status(422).json({ message: "Justificativa obrigatória para marcação atrasada." });
+  }
+
+  // Self check-in: sem lançamento do RH, o colaborador cria o próprio
+  // registro (quantidade 1) dentro de um período OPEN que cubra a data.
+  // É assim que o dia fica "aberto para lançamento" e a gestora confere
+  // em tempo real — antes o portal exigia lançamento prévio e devolvia 404.
   if (!record || record.quantity <= 0) {
-    return res.status(404).json({ message: "Não existe lançamento de almoço para esta data." });
+    const openPeriod = await prisma.billingPeriod.findFirst({
+      where: {
+        status: BillingStatus.OPEN,
+        startDate: { lte: date },
+        endDate: { gte: date }
+      }
+    });
+
+    if (!openPeriod) {
+      return res.status(422).json({ message: "Nenhum período aberto para esta data. Fale com o RH." });
+    }
+
+    const created = await prisma.mealRecord.create({
+      data: {
+        employeeId: employee.id,
+        periodId: openPeriod.id,
+        date,
+        quantity: 1,
+        confirmationStatus: input.status,
+        confirmationSource: "SISTEMA",
+        confirmationNote: note,
+        confirmedAt: new Date(),
+        registeredById: null
+      },
+      include: { period: true }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        entity: "MealRecord",
+        entityId: created.id,
+        action: "EMPLOYEE_PORTAL_CHECKIN",
+        metadata: {
+          employeeId: employee.id,
+          employeeName: employee.name,
+          date: input.date,
+          status: input.status,
+          source: "SISTEMA",
+          selfCreated: true,
+          isLate,
+          note,
+          ip: req.ip,
+          userAgent: req.get("user-agent") ?? null
+        } satisfies Prisma.JsonObject
+      }
+    });
+
+    const selfPayload = {
+      id: created.id,
+      employeeId: employee.id,
+      date: formatDate(created.date),
+      quantity: created.quantity,
+      confirmationStatus: created.confirmationStatus,
+      confirmationSource: created.confirmationSource,
+      confirmationNote: created.confirmationNote,
+      isLate,
+      confirmedAt: created.confirmedAt?.toISOString() ?? null,
+      period: {
+        id: created.period.id,
+        label: created.period.label,
+        status: created.period.status
+      }
+    };
+
+    emitMealConfirmationUpdated({
+      periodId: created.periodId,
+      confirmation: {
+        employeeId: employee.id,
+        employeeName: employee.name,
+        date: selfPayload.date,
+        quantity: created.quantity,
+        confirmationStatus: created.confirmationStatus,
+        confirmationSource: created.confirmationSource,
+        confirmationNote: created.confirmationNote,
+        confirmedAt: selfPayload.confirmedAt
+      }
+    });
+
+    return res.json({ record: selfPayload });
   }
 
   if (record.period.status === BillingStatus.CLOSED) {
@@ -255,12 +343,6 @@ employeePortalRouter.post("/:employeeId/checkin", authenticatePortal, asyncHandl
   // com RH/gestora (decisão travada PLAN-001 §9).
   if (record.confirmationStatus !== "PENDING") {
     return res.status(409).json({ message: "Confirmação já registrada. Para alterar, fale pessoalmente com o RH." });
-  }
-
-  const isLate = formatDate(date) < formatDateKeyInSaoPaulo();
-  const note = input.note?.trim() ? input.note.trim() : null;
-  if (isLate && !note) {
-    return res.status(422).json({ message: "Justificativa obrigatória para marcação atrasada." });
   }
 
   await prisma.$executeRaw`

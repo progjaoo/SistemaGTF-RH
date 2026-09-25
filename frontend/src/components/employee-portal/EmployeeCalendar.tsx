@@ -144,7 +144,7 @@ export function EmployeeCalendar({
             day={selectedDay}
             selectedDate={selectedKey}
             today={today}
-            saving={selectedDay ? savingDate === selectedDay.date : false}
+            saving={!!selectedKey && savingDate === selectedKey}
             onCheckin={onCheckin}
           />
         </>

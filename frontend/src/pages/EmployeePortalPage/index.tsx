@@ -172,7 +172,11 @@ export default function EmployeePortalPage() {
 
     try {
       const response = await api.employeePortalCheckin(selectedEmployee.id, date, status, portalToken, note);
-      setDays((currentDays) => currentDays.map((day) => (day.id === response.record.id ? response.record : day)));
+      setDays((currentDays) =>
+        currentDays.some((day) => day.id === response.record.id)
+          ? currentDays.map((day) => (day.id === response.record.id ? response.record : day))
+          : [...currentDays, response.record].sort((a, b) => a.date.localeCompare(b.date))
+      );
       if (status === "NAO_PEGUEI") toast.info("Registrado: você não pegou o almoço.");
     } catch (error) {
       if (error instanceof Error && /expirada|autenticado|inválida/i.test(error.message)) {

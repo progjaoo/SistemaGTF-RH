@@ -74,9 +74,28 @@ describe("employee-portal/checkin", () => {
     expect(res.status).toBe(422);
   });
 
-  it("data sem lançamento dá 404", async () => {
-    const res = await checkin("2020-08-11");
-    expect(res.status).toBe(404);
+  it("data sem lançamento cria self check-in (200) com quantidade 1", async () => {
+    const res = await checkin("2020-08-11", "PEGUEI", "Almocei e não estava lançado");
+    expect(res.status).toBe(200);
+    expect(res.body.record.confirmationStatus).toBe("PEGUEI");
+    expect(res.body.record.quantity).toBe(1);
+    expect(res.body.record.registeredById ?? null).toBeNull();
+    const row = await prisma.mealRecord.findUnique({
+      where: { employeeId_date: { employeeId, date: d("2020-08-11") } }
+    });
+    expect(row?.quantity).toBe(1);
+    expect(row?.confirmationStatus).toBe("PEGUEI");
+  });
+
+  it("data sem período aberto dá 422", async () => {
+    const res = await checkin("2019-05-05", "PEGUEI", "Fora de período");
+    expect(res.status).toBe(422);
+  });
+
+  it("self check-in atrasado sem justificativa dá 422", async () => {
+    const res = await checkin("2020-08-16");
+    expect(res.status).toBe(422);
+    expect(res.body.message).toContain("Justificativa");
   });
 
   it("status inválido dá 422 (Zod)", async () => {

@@ -42,7 +42,7 @@ const serializeRecord = (record: {
   confirmationStatus?: "PENDING" | "PEGUEI" | "NAO_PEGUEI";
   confirmationSource?: "SISTEMA" | "WHATSAPP" | null;
   confirmedAt?: Date | null;
-  registeredById: string;
+  registeredById: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) => ({
