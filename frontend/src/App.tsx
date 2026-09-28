@@ -15,7 +15,6 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "./api";
 import { Eyebrow, Main, Sidebar, Toolbar, Topbar } from "./components/layout";
-import { ThemeToggle } from "./components/ThemeToggle";
 import { Loading } from "./components/ui";
 import { useSession } from "./hooks/useSession";
 import { useSidebarCollapsed } from "./hooks/useSidebarCollapsed";
@@ -172,9 +171,6 @@ export default function App() {
               </div>
             </div>
           <Toolbar>
-            <div className="max-[600px]:w-auto">
-              <ThemeToggle />
-            </div>
             <select value={selectedPeriodId} onChange={(event) => setSelectedPeriodId(event.target.value)}>
               {periods.map((period) => (
                 <option key={period.id} value={period.id}>

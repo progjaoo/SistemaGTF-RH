@@ -81,8 +81,18 @@ export default function RecordsPage({
   const [saving, setSaving] = useState(false);
   const [loadingConfirmations, setLoadingConfirmations] = useState(false);
   const [confirmationScope, setConfirmationScope] = useState<"DAY" | "PERIOD" | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "PEGUEI" | "NAO_PEGUEI" | "PENDING">("ALL");
   const [confirmationError, setConfirmationError] = useState("");
   const [confirmations, setConfirmations] = useState<MealRecordConfirmation[]>([]);
+  const statusCounts = useMemo(() => ({
+    ALL: confirmations.length,
+    PEGUEI: confirmations.filter((c) => c.confirmationStatus === "PEGUEI").length,
+    NAO_PEGUEI: confirmations.filter((c) => c.confirmationStatus === "NAO_PEGUEI").length,
+    PENDING: confirmations.filter((c) => c.confirmationStatus === "PENDING").length,
+  }), [confirmations]);
+  const visibleConfirmations = confirmationScope && statusFilter === "ALL"
+    ? confirmations
+    : confirmations.filter((c) => c.confirmationStatus === statusFilter);
   const [selectedDate, setSelectedDate] = useState(period.startDate);
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [showImport, setShowImport] = useState(false);
@@ -323,10 +333,20 @@ export default function RecordsPage({
 
           {confirmationError && <EmptyState>{confirmationError}</EmptyState>}
           {!confirmationError && loadingConfirmations && <EmptyState>Carregando confirmações...</EmptyState>}
-          {!confirmationError && !loadingConfirmations && confirmations.length === 0 && (
-            <EmptyState>Nenhum lançamento encontrado para a conferência selecionada.</EmptyState>
+          {!confirmationError && !loadingConfirmations && (
+            <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Filtrar por status">
+              {(["ALL", "PEGUEI", "NAO_PEGUEI", "PENDING"] as const).map((s) => (
+                <Button key={s} type="button" size="sm" variant={statusFilter === s ? "primary" : "outline"}
+                  aria-pressed={statusFilter === s} onClick={() => setStatusFilter(s)}>
+                  {s === "ALL" ? "Todos" : s === "PEGUEI" ? "Pegou" : s === "NAO_PEGUEI" ? "Não pegou" : "Pendente"} ({statusCounts[s]})
+                </Button>
+              ))}
+            </div>
           )}
-          {!confirmationError && !loadingConfirmations && confirmations.length > 0 && (
+          {!confirmationError && !loadingConfirmations && visibleConfirmations.length === 0 && (
+            <EmptyState>Nenhum registro com este status na conferência selecionada.</EmptyState>
+          )}
+          {!confirmationError && !loadingConfirmations && visibleConfirmations.length > 0 && (
             <DataTable>
               <thead>
                 <tr>
@@ -340,7 +360,7 @@ export default function RecordsPage({
                 </tr>
               </thead>
               <tbody>
-                {confirmations.map((confirmation) => (
+                {visibleConfirmations.map((confirmation) => (
                   <tr key={`${confirmation.employeeId}:${confirmation.date}`}>
                     <td>{confirmation.employeeName}</td>
                     <td>{fullDate(confirmation.date)}</td>

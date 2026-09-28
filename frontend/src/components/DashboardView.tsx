@@ -31,6 +31,9 @@ export default function DashboardView({ dashboard }: { dashboard: DashboardSumma
     label: shortDate(item.date)
   }));
 
+  const ranking = dashboard.current.employeeTotals.slice(0, 8);
+  const rankingHeight = Math.max(280, ranking.length * 46 + 60);
+
   return (
     <div className="grid gap-[18px] max-[520px]:gap-3">
       <div className="grid grid-cols-3 gap-[14px] max-[800px]:grid-cols-1 max-[520px]:gap-[10px]">
@@ -63,12 +66,12 @@ export default function DashboardView({ dashboard }: { dashboard: DashboardSumma
         <div className="mb-[14px]">
           <h2 className="m-0 text-[1.05rem]">Ranking de consumo</h2>
         </div>
-        <div className="min-h-[280px] w-full min-w-0 overflow-hidden max-[520px]:min-h-[240px]">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={dashboard.current.employeeTotals.slice(0, 8)} layout="vertical" margin={{ top: 5, right: 20, left: 48, bottom: 5 }}>
+        <div className="w-full min-w-0 overflow-hidden" style={{ minHeight: rankingHeight }}>
+          <ResponsiveContainer width="100%" height={rankingHeight}>
+            <BarChart data={ranking} layout="vertical" margin={{ top: 5, right: 20, left: 8, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-line)" />
               <XAxis type="number" allowDecimals={false} />
-              <YAxis type="category" dataKey="employeeName" width={92} />
+              <YAxis type="category" dataKey="employeeName" width={128} tick={{ fontSize: 12 }} />
               <Tooltip
                 formatter={(value) => [value, "Almoços"]}
                 contentStyle={{ background: "#20262c", color: "#fff", border: "none", borderRadius: 8 }}
