@@ -115,7 +115,7 @@ export function SearchInputWrap({ children }: { children: ReactNode }) {
 
 export function BulkActions({ children }: { children: ReactNode }) {
   return (
-    <div className="flex max-w-[620px] flex-wrap justify-end gap-2 max-[820px]:max-w-none max-[820px]:justify-stretch max-[820px]:[&>button]:flex-[1_1_210px] max-[520px]:[&>button]:w-full max-[520px]:[&>button]:flex-[1_1_100%]">
+    <div className="flex max-w-[620px] flex-wrap justify-end gap-2 max-[820px]:max-w-none max-[820px]:justify-stretch max-[820px]:[&>button]:flex-[1_1_210px] max-[520px]:[&>button]:w-full max-[520px]:[&>button]:flex-[1_1_100%] max-[520px]:[&>button]:min-w-0 max-[520px]:[&>button]:whitespace-normal">
       {children}
     </div>
   );

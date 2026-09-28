@@ -135,6 +135,17 @@ textarea:focus-visible,
 .portal-calendar .dot-confirmed { background: var(--color-teal); }
 .portal-calendar .dot-closed { background: #9ca3af; }
 
+/* 360px: 7 colunas x 44px (308px) estouram os ~282px úteis da seção;
+   reduz só a largura (altura segue 44px para o toque). */
+@media (max-width: 520px) {
+  .portal-calendar .rdp-root {
+    --rdp-day-width: 38px;
+  }
+  .portal-calendar .rdp-day_button {
+    min-width: 38px;
+  }
+}
+
 :root {
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);

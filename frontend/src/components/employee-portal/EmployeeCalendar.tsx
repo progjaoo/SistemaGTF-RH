@@ -117,7 +117,7 @@ export function EmployeeCalendar({
         <button
           type="button"
           onClick={onBack}
-          className="min-h-[38px] rounded-lg border border-line bg-surface px-[10px] py-2 font-extrabold text-teal-deep"
+          className="min-h-10 rounded-lg border border-line bg-surface px-[10px] py-2 font-extrabold text-teal-deep"
         >
           Trocar nome
         </button>

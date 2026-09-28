@@ -197,11 +197,26 @@ Regras:
 - ícones devem ter tamanho coerente, geralmente entre `16` e `20`;
 - botões só com ícone precisam de `title` e `aria-label`.
 
-## Responsividade
+## Responsivo
 
-O sistema deve funcionar no navegador mobile.
+O sistema deve funcionar no navegador mobile, de 360px ao desktop largo, sem scroll horizontal em nenhuma rota.
 
-Breakpoints usados com frequência:
+Escala padrão (usar nesses pontos; não reescrever breakpoints existentes só por churn):
+
+```text
+420 (botões 2col→1col) · 520 (paddings/cards) · 720 (tabelas scroll / heróis)
+900 (shell 1col) · 1020 (grids 2col→1col)
+```
+
+Regras para código novo:
+
+- usar os pontos da escala com variantes arbitrárias (`max-[520px]:`, `max-[720px]:`...); `sm:`/`md:` só onde já existem (LoginPage);
+- tabelas com scroll-x via `DataTable` (vira bloco com `overflow-x-auto` ≤720px); nunca mudar o global sem conferir as 5 telas que o usam;
+- todo controle tocável com ≥40px de altura (`min-h-10`/`h-10`/`size-9`+); checkboxes/radios ≥18px;
+- grids que precisam encolher usam `minmax(0,1fr)`; texto longo usa `min-w-0` + `wrap-anywhere`;
+- dialogs cabem em 360px (`max-w-[calc(100%-2rem)]`, `DialogFooter` empilha no mobile).
+
+Breakpoints legados ainda em uso (não reescrever por churn):
 
 ```css
 @media (max-width: 900px)
@@ -211,7 +226,7 @@ Breakpoints usados com frequência:
 
 Cuidados:
 
-- sidebar vira navegação compacta/mobile;
+- sidebar vira drawer mobile (Sheet) via `SidebarTrigger` no Topbar;
 - tabelas devem aceitar overflow horizontal ou virar cards;
 - textos não podem vazar de botões/cards;
 - evitar altura fixa em telas com muito conteúdo;

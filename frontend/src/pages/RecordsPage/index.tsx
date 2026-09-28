@@ -306,17 +306,19 @@ export default function RecordsPage({
                 {" · Atualiza automaticamente"}
               </p>
             </div>
-            <BulkActions>
-              <Button type="button" variant={confirmationScope === "DAY" ? "primary" : "outline"} onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
-                Dia atual
-              </Button>
-              <Button type="button" variant={confirmationScope === "PERIOD" ? "primary" : "outline"} onClick={() => loadConfirmations("PERIOD")} disabled={loadingConfirmations}>
-                Período inteiro
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setConfirmationScope(null)}>
-                Fechar
-              </Button>
-            </BulkActions>
+            <div className="min-[521px]:contents max-[520px]:w-full">
+              <BulkActions>
+                <Button type="button" variant={confirmationScope === "DAY" ? "primary" : "outline"} onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
+                  Dia atual
+                </Button>
+                <Button type="button" variant={confirmationScope === "PERIOD" ? "primary" : "outline"} onClick={() => loadConfirmations("PERIOD")} disabled={loadingConfirmations}>
+                  Período inteiro
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setConfirmationScope(null)}>
+                  Fechar
+                </Button>
+              </BulkActions>
+            </div>
           </PanelHeader>
 
           {confirmationError && <EmptyState>{confirmationError}</EmptyState>}
@@ -351,11 +353,11 @@ export default function RecordsPage({
                     <td>{confirmation.confirmationSource === "SISTEMA" ? "Sistema" : confirmation.confirmationSource === "WHATSAPP" ? "WhatsApp" : "Sem confirmação"}</td>
                     <td>{confirmation.confirmationNote ?? "—"}</td>
                     <td>
-                      <div className="flex gap-1">
-                        <Button type="button" size="xs" title="Marcar pegou (WhatsApp)" disabled={readOnly} onClick={async () => { await api.setConfirmation(token, { employeeId: confirmation.employeeId, date: confirmation.date, status: "PEGUEI" }); await loadConfirmations(confirmationScope ?? "DAY"); }}>
+                      <div className="flex gap-1 whitespace-nowrap">
+                        <Button type="button" size="sm" title="Marcar pegou (WhatsApp)" disabled={readOnly} onClick={async () => { await api.setConfirmation(token, { employeeId: confirmation.employeeId, date: confirmation.date, status: "PEGUEI" }); await loadConfirmations(confirmationScope ?? "DAY"); }}>
                           Pegou
                         </Button>
-                        <Button type="button" size="xs" variant="outline" title="Marcar não pegou (WhatsApp)" disabled={readOnly} onClick={async () => { await api.setConfirmation(token, { employeeId: confirmation.employeeId, date: confirmation.date, status: "NAO_PEGUEI" }); await loadConfirmations(confirmationScope ?? "DAY"); }}>
+                        <Button type="button" size="sm" variant="outline" title="Marcar não pegou (WhatsApp)" disabled={readOnly} onClick={async () => { await api.setConfirmation(token, { employeeId: confirmation.employeeId, date: confirmation.date, status: "NAO_PEGUEI" }); await loadConfirmations(confirmationScope ?? "DAY"); }}>
                           Não
                         </Button>
                       </div>

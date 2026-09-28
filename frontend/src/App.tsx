@@ -172,7 +172,9 @@ export default function App() {
               </div>
             </div>
           <Toolbar>
-            <ThemeToggle />
+            <div className="max-[600px]:w-auto">
+              <ThemeToggle />
+            </div>
             <select value={selectedPeriodId} onChange={(event) => setSelectedPeriodId(event.target.value)}>
               {periods.map((period) => (
                 <option key={period.id} value={period.id}>
