@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarCheck, Search, ShieldCheck, Soup, Users, WalletCards } from "lucide-react";
+import { CalendarCheck, FileText, Search, ShieldCheck, Soup, Users, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import EmployeePortalPage from "./pages/EmployeePortalPage";
 import PeriodsPage from "./pages/PeriodsPage";
 import PricesPage from "./pages/PricesPage";
 import RecordsPage from "./pages/RecordsPage";
+import ReportsPage from "./pages/ReportsPage";
 import UsersPage from "./pages/UsersPage";
 import type { ApiWarning, BillingPeriod, DashboardSummary, Employee, MealPrice, User } from "./types";
 import { dateKeyInSaoPaulo, dateRange, fullDate } from "./utils/date";
@@ -139,6 +140,7 @@ export default function App() {
   const tabs = ([
     { id: "dashboard", label: "Dashboard", icon: <WalletCards size={18} /> },
     { id: "records", label: "Lançamentos", icon: <Soup size={18} /> },
+    { id: "reports", label: "Relatórios", icon: <FileText size={18} /> },
     { id: "employees", label: "Funcionários", icon: <Users size={18} /> },
     { id: "prices", label: "Preços", icon: <WalletCards size={18} />, rhOnly: true },
     { id: "periods", label: "Períodos", icon: <CalendarCheck size={18} />, rhOnly: true },
@@ -196,7 +198,6 @@ export default function App() {
         <RecordsPage
           token={session.token}
           employees={employees}
-          prices={prices}
             period={selectedPeriod}
             quantities={quantities}
             warnings={warnings}
@@ -219,6 +220,12 @@ export default function App() {
               else toast.success("Lançamentos salvos.");
               await refreshSelectedPeriod();
             }}
+          />
+        )}
+        {activeTab === "reports" && (
+          <ReportsPage
+            token={session.token}
+            periods={periods}
             onImported={async () => {
               await refreshSelectedPeriod();
               toast.success("Planilha importada e lançamentos recarregados.");

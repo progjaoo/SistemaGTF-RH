@@ -1,7 +1,7 @@
 import { BillingStatus, EmployeeStatus, Prisma } from "@prisma/client";
 import express from "express";
 import { z } from "zod";
-import { formatDate, isBetween, parseDate } from "../lib/dates.js";
+import { formatDate, isBetween, isExpectedWorkday, parseDate } from "../lib/dates.js";
 import { normalizeSearch } from "../lib/names.js";
 import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
@@ -133,6 +133,9 @@ mealRecordsRouter.post("/confirmations", asyncHandler(async (req, res) => {
   const input = confirmationSetSchema.parse(req.body);
   const date = parseDate(input.date);
 
+  const dayClosed = await prisma.dayClose.findUnique({ where: { date } });
+  if (dayClosed) return res.status(422).json({ message: "Dia fechado para lançamentos. Reabra o dia para editar." });
+
   if (isFutureDate(date)) {
     return res.status(422).json({ message: "Não é possível marcar data futura." });
   }
@@ -205,6 +208,53 @@ mealRecordsRouter.post("/confirmations", asyncHandler(async (req, res) => {
   res.json({ confirmation });
 }));
 
+const daySchema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato YYYY-MM-DD.") });
+
+mealRecordsRouter.get("/day-status", asyncHandler(async (req, res) => {
+  const input = daySchema.parse(req.query);
+  const existing = await prisma.dayClose.findUnique({ where: { date: parseDate(input.date) } });
+  res.json({ date: input.date, closed: Boolean(existing) });
+}));
+
+mealRecordsRouter.post("/day-close", asyncHandler(async (req, res) => {
+  const actor = (req as AuthenticatedRequest).user;
+  const input = daySchema.parse(req.body);
+  const date = parseDate(input.date);
+  if (isFutureDate(date)) return res.status(422).json({ message: "Não é possível fechar data futura." });
+  const period = await prisma.billingPeriod.findFirst({
+    where: { status: BillingStatus.OPEN, startDate: { lte: date }, endDate: { gte: date } }
+  });
+  if (!period) return res.status(422).json({ message: "Nenhum período aberto para esta data." });
+  const existing = await prisma.dayClose.findUnique({ where: { date } });
+  if (existing) return res.status(409).json({ message: "Dia já fechado." });
+  const records = await prisma.mealRecord.findMany({
+    where: { date }, include: { employee: { select: { id: true, name: true, status: true, scheduleType: true, workdays: true } } }
+  });
+  const pending = records.filter((r) => r.confirmationStatus === "PENDING").map((r) => r.employee.name);
+  if (pending.length) return res.status(409).json({ message: "Há confirmações pendentes.", pending });
+  const withRecord = new Set(records.map((r) => r.employeeId));
+  const employees = await prisma.employee.findMany({ where: { status: "ACTIVE" } });
+  const missing = employees
+    .filter((e) => !withRecord.has(e.id) && isExpectedWorkday(date, e.scheduleType, e.workdays ?? null))
+    .map((e) => e.name);
+  if (missing.length) return res.status(409).json({ message: "Há colaboradores sem marcação.", missing });
+  const dayClose = await prisma.dayClose.create({
+    data: { date, periodId: period.id, closedById: actor.id }
+  });
+  await prisma.auditLog.create({ data: { actorId: actor.id, entity: "DayClose", entityId: dayClose.id, action: "DAY_CLOSE", metadata: { date: input.date } } });
+  res.status(201).json({ dayClose: { date: input.date, closedAt: dayClose.closedAt } });
+}));
+
+mealRecordsRouter.post("/day-reopen", asyncHandler(async (req, res) => {
+  const actor = (req as AuthenticatedRequest).user;
+  const input = daySchema.parse(req.body);
+  const existing = await prisma.dayClose.findUnique({ where: { date: parseDate(input.date) } });
+  if (!existing) return res.status(404).json({ message: "Dia não está fechado." });
+  await prisma.dayClose.delete({ where: { date: parseDate(input.date) } });
+  await prisma.auditLog.create({ data: { actorId: actor.id, entity: "DayClose", entityId: existing.id, action: "DAY_REOPEN", metadata: { date: input.date } } });
+  res.json({ ok: true });
+}));
+
 mealRecordsRouter.post("/bulk", asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const input = bulkSchema.parse(req.body);
@@ -221,6 +271,16 @@ mealRecordsRouter.post("/bulk", asyncHandler(async (req, res) => {
     return res.status(422).json({
       message: "Existem lançamentos com data futura.",
       invalidDates: futureDateValidation.invalidDates
+    });
+  }
+
+  const closedRows = await prisma.dayClose.findMany({
+    where: { date: { in: parsedEntries.map((entry) => entry.dateValue) } }
+  });
+  if (closedRows.length > 0) {
+    return res.status(422).json({
+      message: "Dia fechado para lançamentos. Reabra o dia para editar.",
+      closedDates: closedRows.map((row) => formatDate(row.date)).sort()
     });
   }
 
@@ -310,6 +370,11 @@ mealRecordsRouter.post("/import", asyncHandler(async (req, res) => {
   const preview: ImportPreviewRow[] = [];
   const valid: Array<{ employeeId: string; date: Date; dateLabel: string; quantity: number }> = [];
 
+  const closedRows = await prisma.dayClose.findMany({
+    where: { date: { gte: period.startDate, lte: period.endDate } }
+  });
+  const closedDates = new Set(closedRows.map((row) => formatDate(row.date)));
+
   input.rows.forEach((row, position) => {
     const index = position + 1;
     const base = { index, name: row.name ?? "", date: row.date, quantity: row.quantity };
@@ -328,6 +393,10 @@ mealRecordsRouter.post("/import", asyncHandler(async (req, res) => {
     }
     if (!isBetween(dateValue, period.startDate, period.endDate)) {
       fail(`Data ${row.date} fora do período selecionado.`);
+      return;
+    }
+    if (closedDates.has(row.date)) {
+      fail(`Data ${row.date} em dia fechado.`);
       return;
     }
 

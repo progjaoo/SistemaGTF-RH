@@ -18,6 +18,7 @@ model User {
   updatedAt      DateTime        @updatedAt
   mealRecords    MealRecord[]    @relation("RegisteredBy")
   closedPeriods  BillingPeriod[] @relation("ClosedBy")
+  closedDays     DayClose[]      @relation("DayClosedBy")
   createdPrices  MealPrice[]     @relation("PriceCreatedBy")
   auditLogs      AuditLog[]      @relation("AuditActor")
 }
@@ -129,6 +130,7 @@ model BillingPeriod {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   mealRecords MealRecord[]
+  dayCloses   DayClose[]
 
   @@index([status])
   @@index([startDate, endDate])
@@ -137,6 +139,18 @@ model BillingPeriod {
 enum BillingStatus {
   OPEN
   CLOSED
+}
+
+model DayClose {
+  id         String        @id @default(uuid()) @db.Uuid
+  date       DateTime      @db.Date @unique
+  periodId   String        @db.Uuid
+  period     BillingPeriod @relation(fields: [periodId], references: [id])
+  closedAt   DateTime      @default(now())
+  closedById String?       @db.Uuid
+  closedBy   User?         @relation("DayClosedBy", fields: [closedById], references: [id])
+
+  @@index([periodId])
 }
 
 model AuditLog {

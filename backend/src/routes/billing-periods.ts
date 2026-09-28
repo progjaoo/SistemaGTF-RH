@@ -1,4 +1,3 @@
-import ExcelJS from "exceljs";
 import { BillingStatus, Role } from "@prisma/client";
 import express from "express";
 import { z } from "zod";
@@ -7,6 +6,7 @@ import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { authenticate, requireRole, type AuthenticatedRequest } from "../middleware/auth.js";
 import { calculatePeriodSummary, serializePeriod } from "../services/calculations.js";
+import { buildXlsxBuffer } from "../services/report-files.js";
 import { sanitizeReportFilename, buildPeriodPdf } from "../services/report-pdf.js";
 
 export const billingPeriodsRouter = express.Router();
@@ -228,31 +228,7 @@ billingPeriodsRouter.get("/:id/report", asyncHandler(async (req, res) => {
     return res.json({ report: summary });
   }
 
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Relatorio");
-
-  sheet.columns = [
-    { header: "Funcionario", key: "employeeName", width: 30 },
-    { header: "Quantidade (pegou)", key: "quantity", width: 18 },
-    { header: "Não pegou (dias)", key: "notTaken", width: 16 },
-    { header: "Pendente (dias)", key: "pending", width: 16 },
-    { header: "Preco(s) aplicado(s)", key: "unitPrices", width: 22 },
-    { header: "Valor a descontar", key: "amount", width: 20 }
-  ];
-  sheet.getRow(1).font = { bold: true };
-  sheet.addRows(summary.employeeTotals.map((item) => ({
-    employeeName: item.employeeName,
-    quantity: item.quantity,
-    notTaken: item.notTaken,
-    pending: item.pending,
-    unitPrices: item.unitPrices.map((price) => `R$ ${price.toFixed(2)}`).join(", "),
-    amount: item.amount
-  })));
-  sheet.addRow({});
-  sheet.addRow({ employeeName: "Total geral", quantity: summary.totalQuantity, amount: summary.totalAmount });
-  sheet.getColumn("amount").numFmt = '"R$"#,##0.00';
-
-  const buffer = await workbook.xlsx.writeBuffer();
+  const buffer = await buildXlsxBuffer(summary);
 
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="${summary.period.label}.xlsx"`);

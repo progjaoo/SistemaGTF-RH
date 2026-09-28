@@ -258,6 +258,9 @@ employeePortalRouter.post("/:employeeId/checkin", authenticatePortal, asyncHandl
   const input = checkinSchema.parse(req.body);
   const date = parseDate(input.date);
 
+  const dayClosed = await prisma.dayClose.findUnique({ where: { date } });
+  if (dayClosed) return res.status(422).json({ message: "Dia fechado para lançamentos. Reabra o dia para editar." });
+
   if (isFutureDate(date)) {
     return res.status(422).json({ message: "Não é possível confirmar almoço em data futura." });
   }

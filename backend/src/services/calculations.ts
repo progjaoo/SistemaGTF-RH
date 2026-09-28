@@ -1,4 +1,4 @@
-import type { BillingPeriod, Employee, MealPrice, MealRecord } from "@prisma/client";
+import { BillingStatus, type BillingPeriod, type Employee, type MealPrice, type MealRecord } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { formatDate } from "../lib/dates.js";
 
@@ -35,6 +35,52 @@ export async function calculatePeriodSummary(periodId: string) {
     prisma.mealPrice.findMany()
   ]);
 
+  return {
+    period: serializePeriod(period),
+    ...buildSummaryBody(records as RecordWithEmployee[], prices)
+  };
+}
+
+// Relatório por intervalo arbitrário (cruza períodos): mesmos registros e
+// MESMA regra PEGUEI-only do período — só muda o filtro (range de datas) e
+// o objeto `period` sintético (id "range", sem contraparte no banco).
+export async function calculateRangeSummary(start: Date, end: Date) {
+  const [records, prices] = await Promise.all([
+    prisma.mealRecord.findMany({
+      where: { date: { gte: start, lte: end } },
+      include: { employee: true },
+      orderBy: [{ date: "asc" }, { employee: { name: "asc" } }]
+    }),
+    prisma.mealPrice.findMany()
+  ]);
+
+  const body = buildSummaryBody(records as RecordWithEmployee[], prices);
+  const now = new Date();
+
+  return {
+    period: {
+      id: "range",
+      label: `${formatBrDate(start)} a ${formatBrDate(end)}`,
+      startDate: formatDate(start),
+      endDate: formatDate(end),
+      status: BillingStatus.OPEN,
+      closedAt: null,
+      closedById: null,
+      totalAmount: body.totalAmount,
+      createdAt: now,
+      updatedAt: now
+    },
+    ...body
+  };
+}
+
+const pad2 = (value: number) => String(value).padStart(2, "0");
+
+function formatBrDate(date: Date) {
+  return `${pad2(date.getUTCDate())}/${pad2(date.getUTCMonth() + 1)}/${date.getUTCFullYear()}`;
+}
+
+function buildSummaryBody(records: RecordWithEmployee[], prices: MealPrice[]) {
   const employeeMap = new Map<string, {
     employeeId: string;
     employeeName: string;
@@ -50,7 +96,7 @@ export async function calculatePeriodSummary(periodId: string) {
   let totalQuantity = 0;
   let totalAmount = 0;
 
-  for (const record of records as RecordWithEmployee[]) {
+  for (const record of records) {
     const price = resolveMealPrice(prices, record.employeeId, record.date);
     const unitPrice = price ? Number(price.value) : 0;
     // PLAN-005: o colaborador rege — só PEGUEI é faturável.
@@ -87,7 +133,6 @@ export async function calculatePeriodSummary(periodId: string) {
   }
 
   return {
-    period: serializePeriod(period),
     totalQuantity,
     totalAmount: roundCurrency(totalAmount),
     employeeTotals: [...employeeMap.values()]

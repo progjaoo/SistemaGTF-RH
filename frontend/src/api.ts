@@ -38,10 +38,22 @@ async function request<T>(path: string, token?: string, init: RequestInit = {}):
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: "Erro ao comunicar com a API." }));
-    throw new Error(error.message ?? "Erro ao comunicar com a API.");
+    throw new ApiError(error.message ?? "Erro ao comunicar com a API.", response.status, error);
   }
 
   return response.json() as Promise<T>;
+}
+
+export class ApiError extends Error {
+  status: number;
+  body: unknown;
+
+  constructor(message: string, status: number, body: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.body = body;
+  }
 }
 
 export const api = {
@@ -151,6 +163,15 @@ export const api = {
       body: JSON.stringify(payload)
     });
   },
+  dayStatus(token: string, date: string) {
+    return request<{ date: string; closed: boolean }>(`/meal-records/day-status?date=${date}`, token);
+  },
+  closeDay(token: string, date: string) {
+    return request<{ dayClose: { date: string; closedAt: string } }>("/meal-records/day-close", token, { method: "POST", body: JSON.stringify({ date }) });
+  },
+  reopenDay(token: string, date: string) {
+    return request<{ ok: boolean }>("/meal-records/day-reopen", token, { method: "POST", body: JSON.stringify({ date }) });
+  },
   employeePortalSearch(name: string) {
     return request<{ employees: EmployeePortalSearchResult[] }>(`/employee-portal/search?name=${encodeURIComponent(name)}`);
   },
@@ -201,8 +222,8 @@ export const api = {
       body: JSON.stringify(payload)
     });
   },
-  async downloadReport(token: string, period: BillingPeriod) {
-    const response = await fetch(`${API_BASE}/billing-periods/${period.id}/report?format=xlsx`, {
+  async downloadReport(token: string, period: BillingPeriod, format: "xlsx" | "pdf" = "xlsx") {
+    const response = await fetch(`${API_BASE}/billing-periods/${period.id}/report?format=${format}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!response.ok) throw new Error("Não foi possível exportar o relatório.");
@@ -210,7 +231,21 @@ export const api = {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${period.label}.xlsx`;
+    anchor.download = `${period.label}.${format}`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  },
+  async downloadRangeReport(token: string, range: { start: string; end: string; format: "xlsx" | "pdf" }) {
+    const params = new URLSearchParams({ start: range.start, end: range.end, format: range.format });
+    const response = await fetch(`${API_BASE}/reports?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error("Não foi possível gerar o relatório.");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `relatorio_${range.start.replace(/-/g, "")}_a_${range.end.replace(/-/g, "")}.${range.format}`;
     anchor.click();
     URL.revokeObjectURL(url);
   }

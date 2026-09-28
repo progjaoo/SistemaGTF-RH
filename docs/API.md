@@ -71,14 +71,29 @@ Authorization: Bearer TOKEN
 - `POST /meal-records/bulk`
 - `POST /meal-records/import`
 - `GET /meal-records/confirmations?periodId=...&date=...`
+- `POST /meal-records/confirmations` — RH/gestora marca `PEGUEI`/`NAO_PEGUEI` com origem `WHATSAPP` (cria com qtd 1 se não existir; pode corrigir confirmação existente)
+- `POST /meal-records/day-close` — corpo `{ date }`; trava a data para todos
+- `POST /meal-records/day-reopen` — corpo `{ date }`; destrava a data
+- `GET /meal-records/day-status?date=...` — `{ date, closed }`
 
 Regras:
 
 - `POST /meal-records/bulk` rejeita a requisição inteira com `422` se qualquer item tiver `date` maior que hoje.
 - `POST /meal-records/import` aceita linhas `{ name?, employeeId?, date, quantity }`: com `dryRun: true` retorna `preview` linha a linha sem gravar; sem `dryRun`, qualquer linha inválida (nome não encontrado/ambíguo, data inválida/futura/fora do período, quantidade fora de 0–10) bloqueia tudo com `422`. Nunca cria período nem funcionário; commit gera `AuditLog` `IMPORT_PLANILHA`.
 - `GET /meal-records/confirmations` é protegido por login e pode ser usado por RH e Gestora para conferir `PENDING`, `PEGUEI` e `NAO_PEGUEI`.
-- `confirmationSource` pode ser `SISTEMA`, `WHATSAPP` ou `null`; `WHATSAPP` fica reservado para integração futura.
+- `confirmationSource` pode ser `SISTEMA`, `WHATSAPP` ou `null`.
 - A conferência da gestora usa Socket.IO para receber confirmações do Portal do Colaborador em tempo real quando o painel "Verificar quem Pegou" está aberto.
+
+## Fechar o dia
+
+- Fechar trava a data inteira para todos (portal, marcação manual, bulk e import devolvem `422`).
+- Só fecha sem `PENDING` e sem faltantes em jornada esperada (`409` com `pending:[nomes]` ou `missing:[nomes]`).
+- `POST /meal-records/day-reopen` destrava; tudo auditado (`DAY_CLOSE`/`DAY_REOPEN`, RH e gestora).
+
+## Relatórios (tela Relatórios — RH e gestora)
+
+- `GET /api/reports?start=YYYY-MM-DD&end=YYYY-MM-DD&format=json|xlsx|pdf` — soma por intervalo cruzando períodos, só `PEGUEI` é faturável; intervalo máximo 366 dias.
+- Exportar planilha / gerar PDF / importar planilha moram na tela Relatórios (saíram do Lançamentos).
 
 Exemplo de erro para data futura:
 
