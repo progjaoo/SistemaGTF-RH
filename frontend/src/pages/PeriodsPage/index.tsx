@@ -102,7 +102,7 @@ export default function PeriodsPage({
             <h2>Períodos</h2>
             <p>{totalOpen} abertos · {totalClosed} fechados</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 max-[520px]:w-full max-[520px]:[&>button]:w-full">
             <Button type="button" variant="outline" onClick={() => setNewOpen(true)}>
               <Plus size={17} /> Novo período
             </Button>

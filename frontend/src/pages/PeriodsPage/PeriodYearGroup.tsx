@@ -14,8 +14,8 @@ export default function PeriodYearGroup({ year, periods, openCount, defaultOpen,
   useEffect(() => { setOpen(defaultOpen); }, [defaultOpen]);
   return (
     <div className="rounded-lg border border-line">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
-        <span className="flex items-center gap-2 font-bold">{year}
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full min-w-0 items-center justify-between gap-3 px-4 py-3 text-left">
+        <span className="flex min-w-0 flex-wrap items-center gap-2 font-bold">{year}
           <Badge variant={openCount > 0 ? "warn" : "good"}>{openCount > 0 ? `${openCount} aberto(s)` : "tudo fechado"}</Badge>
           <span className="text-sm font-normal text-muted">{periods.length} períodos</span>
         </span>
