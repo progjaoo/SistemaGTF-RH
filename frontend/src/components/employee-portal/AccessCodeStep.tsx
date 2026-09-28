@@ -45,7 +45,7 @@ export function AccessCodeStep({
             required
             minLength={6}
             maxLength={6}
-            className="min-h-[44px] rounded-lg border border-line bg-white px-[10px] py-2 text-center text-[1.6rem] tracking-[0.5em] text-ink focus:border-teal focus:outline-none"
+            className="min-h-[44px] rounded-lg border border-line bg-surface px-[10px] py-2 text-center text-[1.6rem] tracking-[0.5em] text-ink focus:border-teal focus:outline-none"
           />
         </div>
         <Button type="submit" disabled={loading || code.length !== 6}>
@@ -64,7 +64,7 @@ export function AccessCodeStep({
         <button
           type="button"
           onClick={onBack}
-          className="min-h-11 rounded-lg border border-line bg-white font-extrabold text-teal-deep"
+          className="min-h-11 rounded-lg border border-line bg-surface font-extrabold text-teal-deep"
         >
           Trocar nome
         </button>

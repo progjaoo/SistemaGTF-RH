@@ -95,7 +95,7 @@ export function DailyTotalCard({ children }: { children: ReactNode }) {
 
 export function RecordsTools({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-end justify-between gap-3 rounded-lg border border-line bg-white/75 p-[14px] shadow-[0_18px_48px_rgb(32_38_44/0.08)] max-[820px]:flex-col max-[820px]:items-stretch max-[520px]:p-3">
+    <div className="flex items-end justify-between gap-3 rounded-lg border border-line bg-surface/75 p-[14px] shadow-[0_18px_48px_rgb(32_38_44/0.08)] max-[820px]:flex-col max-[820px]:items-stretch max-[520px]:p-3">
       {children}
     </div>
   );
@@ -154,7 +154,7 @@ export function EmployeeIdentity({ children }: { children: ReactNode }) {
 
 export function EmployeeInitials({ children }: { children: ReactNode }) {
   return (
-    <div aria-hidden="true" className="grid h-[52px] w-[52px] flex-none place-items-center rounded-lg border border-teal/20 bg-gradient-to-b from-teal-bg to-white font-black text-teal-deep max-[520px]:h-11 max-[520px]:w-11">
+    <div aria-hidden="true" className="grid h-[52px] w-[52px] flex-none place-items-center rounded-lg border border-teal/20 bg-gradient-to-b from-teal-bg to-surface font-black text-teal-deep max-[520px]:h-11 max-[520px]:w-11">
       {children}
     </div>
   );
@@ -164,7 +164,7 @@ export function QuantityControl({ children, ...props }: { children: ReactNode } 
   return (
     <div
       {...props}
-      className="grid min-h-[58px] grid-cols-[58px_minmax(110px,1fr)_58px] items-stretch justify-stretch overflow-hidden rounded-lg border border-line bg-white max-[620px]:w-full max-[620px]:grid-cols-[52px_minmax(92px,1fr)_52px]"
+      className="grid min-h-[58px] grid-cols-[58px_minmax(110px,1fr)_58px] items-stretch justify-stretch overflow-hidden rounded-lg border border-line bg-surface max-[620px]:w-full max-[620px]:grid-cols-[52px_minmax(92px,1fr)_52px]"
     >
       {children}
     </div>

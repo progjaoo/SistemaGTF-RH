@@ -40,7 +40,7 @@ export function DayCheckin({
         onCheckin(selectedDate, status, note.trim() ? note.trim() : undefined);
       }
       return (
-        <article className={cn("grid gap-3 rounded-lg border bg-white p-[14px]", late ? "border-[#f59e0b]" : "border-teal/25")}>
+        <article className={cn("grid gap-3 rounded-lg border bg-surface p-[14px]", late ? "border-[#f59e0b]" : "border-teal/25")}>
           <div className="grid gap-[3px]">
             <strong className="text-[1rem]">{fullDate(selectedDate)}</strong>
             <span className="text-[0.87rem] font-bold text-muted">
@@ -57,7 +57,7 @@ export function DayCheckin({
               title="Registrar que peguei"
               aria-label={`Registrar que peguei almoço em ${fullDate(selectedDate)}`}
               onClick={() => create("PEGUEI")}
-              className="inline-flex min-h-11 items-center justify-center gap-[7px] rounded-lg border border-line bg-white px-[10px] py-[9px] font-extrabold text-ink disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center gap-[7px] rounded-lg border border-line bg-surface px-[10px] py-[9px] font-extrabold text-ink disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Check size={18} />
               Peguei
@@ -68,7 +68,7 @@ export function DayCheckin({
               title="Registrar que não peguei"
               aria-label={`Registrar que não peguei almoço em ${fullDate(selectedDate)}`}
               onClick={() => create("NAO_PEGUEI")}
-              className="inline-flex min-h-11 items-center justify-center gap-[7px] rounded-lg border border-line bg-white px-[10px] py-[9px] font-extrabold text-ink disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center gap-[7px] rounded-lg border border-line bg-surface px-[10px] py-[9px] font-extrabold text-ink disabled:cursor-not-allowed disabled:opacity-60"
             >
               <X size={18} />
               Não peguei
@@ -85,7 +85,7 @@ export function DayCheckin({
               placeholder={needNote ? "Por que não marcou no dia?" : "Ex: saí mais cedo..."}
               rows={2}
               maxLength={500}
-              className="min-h-[56px] resize-y rounded-lg border border-line bg-white p-[10px] focus:border-teal focus:outline-none"
+              className="min-h-[56px] resize-y rounded-lg border border-line bg-surface p-[10px] focus:border-teal focus:outline-none"
             />
           </div>
           <span className="text-[0.82rem] font-bold text-muted">
@@ -96,14 +96,14 @@ export function DayCheckin({
     }
     if (selectedDate) {
       return (
-        <div className="rounded-lg border border-dashed border-line bg-white/70 p-7 text-muted">
+        <div className="rounded-lg border border-dashed border-line bg-surface/70 p-7 text-muted">
           Nenhum almoço lançado para {fullDate(selectedDate)}.
           {" "}Se você trabalhou neste dia, fale com o RH.
         </div>
       );
     }
     return (
-      <div className="rounded-lg border border-dashed border-line bg-white/70 p-7 text-muted">
+      <div className="rounded-lg border border-dashed border-line bg-surface/70 p-7 text-muted">
         Toque em um dia marcado com ponto para confirmar.
       </div>
     );
@@ -122,7 +122,7 @@ export function DayCheckin({
   }
 
   return (
-    <article className={cn("grid gap-3 rounded-lg border bg-white p-[14px]", isLate && !isConfirmed ? "border-[#f59e0b]" : "border-teal/25")}>
+    <article className={cn("grid gap-3 rounded-lg border bg-surface p-[14px]", isLate && !isConfirmed ? "border-[#f59e0b]" : "border-teal/25")}>
       <div className="grid gap-[3px]">
         <strong className="text-[1rem]">{fullDate(day.date)}</strong>
         <span className="text-[0.87rem] font-bold text-muted">
@@ -149,7 +149,7 @@ export function DayCheckin({
               title="Confirmar que peguei"
               aria-label={`Confirmar que peguei almoço em ${fullDate(day.date)}`}
               onClick={() => submit("PEGUEI")}
-              className="inline-flex min-h-11 items-center justify-center gap-[7px] rounded-lg border border-line bg-white px-[10px] py-[9px] font-extrabold text-ink disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center gap-[7px] rounded-lg border border-line bg-surface px-[10px] py-[9px] font-extrabold text-ink disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Check size={18} />
               Peguei
@@ -160,7 +160,7 @@ export function DayCheckin({
               title="Confirmar que não peguei"
               aria-label={`Confirmar que não peguei almoço em ${fullDate(day.date)}`}
               onClick={() => submit("NAO_PEGUEI")}
-              className="inline-flex min-h-11 items-center justify-center gap-[7px] rounded-lg border border-line bg-white px-[10px] py-[9px] font-extrabold text-ink disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center gap-[7px] rounded-lg border border-line bg-surface px-[10px] py-[9px] font-extrabold text-ink disabled:cursor-not-allowed disabled:opacity-60"
             >
               <X size={18} />
               Não peguei
@@ -178,7 +178,7 @@ export function DayCheckin({
               placeholder={noteRequired ? "Por que não marcou no dia?" : "Ex: saí mais cedo..."}
               rows={2}
               maxLength={500}
-              className="min-h-[56px] resize-y rounded-lg border border-line bg-white p-[10px] focus:border-teal focus:outline-none"
+              className="min-h-[56px] resize-y rounded-lg border border-line bg-surface p-[10px] focus:border-teal focus:outline-none"
             />
           </div>
 

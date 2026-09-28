@@ -198,7 +198,7 @@ export default function EmployeesPage({
                         key={day.value}
                         className={cn(
                           "inline-flex min-h-11 cursor-pointer items-center gap-[6px] rounded-lg border px-3 py-2 font-extrabold text-ink",
-                          active ? "border-teal bg-teal-bg" : "border-line bg-white"
+                          active ? "border-teal bg-teal-bg" : "border-line bg-surface"
                         )}
                       >
                         <input

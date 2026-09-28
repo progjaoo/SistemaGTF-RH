@@ -19,13 +19,13 @@ export default function PeriodFilterBar({
           onChange={(e) => onChange({ ...filter, query: e.target.value })}
           placeholder="Buscar período…"
           aria-label="Buscar período"
-          className="min-h-10 w-full rounded-lg border border-line bg-white pl-9 pr-3 text-ink focus:border-teal focus:outline-none"
+          className="min-h-10 w-full rounded-lg border border-line bg-surface pl-9 pr-3 text-ink focus:border-teal focus:outline-none"
         />
       </div>
       <select
         value={filter.year}
         onChange={(e) => onChange({ ...filter, year: e.target.value })}
-        className="min-h-10 rounded-lg border border-line bg-white px-3 text-ink"
+        className="min-h-10 rounded-lg border border-line bg-surface px-3 text-ink"
         aria-label="Filtrar por ano"
       >
         <option value="all">Todos os anos</option>
@@ -36,7 +36,7 @@ export default function PeriodFilterBar({
         onClick={() => onChange({ ...filter, onlyOpen: !filter.onlyOpen })}
         aria-pressed={filter.onlyOpen}
         title={filter.onlyOpen ? "Mostrar todos" : "Mostrar somente abertos"}
-        className={`min-h-10 rounded-lg border px-3 text-sm font-bold ${filter.onlyOpen ? "border-teal bg-teal-bg text-teal-deep" : "border-line bg-white text-muted"}`}
+        className={`min-h-10 rounded-lg border px-3 text-sm font-bold ${filter.onlyOpen ? "border-teal bg-teal-bg text-teal-deep" : "border-line bg-surface text-muted"}`}
       >
         Abertos ({totalOpen}) · Fechados ({totalClosed})
       </button>

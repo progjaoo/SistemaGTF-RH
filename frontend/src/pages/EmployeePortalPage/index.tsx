@@ -194,7 +194,7 @@ export default function EmployeePortalPage() {
   }
 
   return (
-    <main className="grid min-h-[100dvh] content-start justify-items-center gap-5 bg-paper bg-[linear-gradient(90deg,rgb(43_168_162/0.08)_0_1px,transparent_1px_100%)] bg-[length:42px_42px] p-[clamp(18px,5vw,42px)]">
+    <main className="grid min-h-[100dvh] content-start justify-items-center gap-5 bg-paper bg-[linear-gradient(90deg,rgb(43_168_162/0.08)_0_1px,transparent_1px_100%)] bg-[length:42px_42px] p-[clamp(18px,5vw,42px)] dark:bg-[linear-gradient(90deg,rgb(43_168_162/0.05)_0_1px,transparent_1px_100%)]">
       <header className="flex w-[min(760px,100%)] items-center gap-[14px] text-ink">
         <BrandLogo src={logoGtf} alt="Grupo GTF" className="h-[54px] w-[92px]" />
         <div className="flex-1">

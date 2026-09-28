@@ -45,7 +45,7 @@ export function PushReminderToggle({ employeeId, portalToken }: { employeeId: st
   }
   return (
     <button type="button" onClick={() => void (state === "on" ? disable() : enable())} disabled={state === "busy"}
-      className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-bold text-teal-deep disabled:opacity-60">
+      className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm font-bold text-teal-deep disabled:opacity-60">
       {state === "on" ? <><BellOff size={16} /> Desativar lembrete 14:30</> : <><Bell size={16} /> {state === "busy" ? "Ativando..." : "Ativar lembrete 14:30"}</>}
     </button>
   );

@@ -14,7 +14,7 @@ export function IconButton({
       type="button"
       {...props}
       className={cn(
-        "grid h-9 w-9 place-items-center rounded-lg border border-line bg-white text-ink transition-colors hover:bg-teal-bg hover:text-teal-deep disabled:cursor-not-allowed disabled:opacity-50",
+        "grid h-9 w-9 place-items-center rounded-lg border border-line bg-surface text-ink transition-colors hover:bg-teal-bg hover:text-teal-deep disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
     >
@@ -65,7 +65,7 @@ export function FormGrid({ children, onSubmit }: { children: ReactNode; onSubmit
 
 export function Field({ children }: { children: ReactNode }) {
   return (
-    <div className="grid gap-[6px] [&>label]:text-[0.82rem] [&>label]:font-bold [&>label]:text-muted [&>input]:min-h-10 [&>input]:w-full [&>input]:rounded-lg [&>input]:border [&>input]:border-line [&>input]:bg-white [&>input]:px-[10px] [&>input]:py-2 [&>input]:text-ink [&>input]:focus:border-teal [&>input]:focus:outline-none [&>select]:min-h-10 [&>select]:w-full [&>select]:rounded-lg [&>select]:border [&>select]:border-line [&>select]:bg-white [&>select]:px-[10px] [&>select]:py-2 [&>select]:text-ink [&>select]:focus:border-teal [&>select]:focus:outline-none [&>textarea]:rounded-lg [&>textarea]:border [&>textarea]:border-line [&>textarea]:bg-white [&>textarea]:p-[10px] [&>textarea]:focus:border-teal [&>textarea]:focus:outline-none">
+    <div className="grid gap-[6px] [&>label]:text-[0.82rem] [&>label]:font-bold [&>label]:text-muted [&>input]:min-h-10 [&>input]:w-full [&>input]:rounded-lg [&>input]:border [&>input]:border-line [&>input]:bg-surface [&>input]:px-[10px] [&>input]:py-2 [&>input]:text-ink [&>input]:focus:border-teal [&>input]:focus:outline-none [&>select]:min-h-10 [&>select]:w-full [&>select]:rounded-lg [&>select]:border [&>select]:border-line [&>select]:bg-surface [&>select]:px-[10px] [&>select]:py-2 [&>select]:text-ink [&>select]:focus:border-teal [&>select]:focus:outline-none [&>textarea]:rounded-lg [&>textarea]:border [&>textarea]:border-line [&>textarea]:bg-surface [&>textarea]:p-[10px] [&>textarea]:focus:border-teal [&>textarea]:focus:outline-none">
       {children}
     </div>
   );
@@ -101,7 +101,7 @@ export function Loading({ children }: { children: ReactNode }) {
 
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed border-line bg-white/70 p-7 text-muted">
+    <div className="rounded-lg border border-dashed border-line bg-surface/70 p-7 text-muted">
       {children}
     </div>
   );

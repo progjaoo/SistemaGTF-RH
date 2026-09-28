@@ -20,7 +20,7 @@ const shortDate = (value: string) =>
 export default function DashboardView({ dashboard }: { dashboard: DashboardSummary | null }) {
   if (!dashboard) {
     return (
-      <div className="rounded-lg border border-dashed border-line bg-white/70 p-7 text-muted">
+      <div className="rounded-lg border border-dashed border-line bg-surface/70 p-7 text-muted">
         Selecione um período para visualizar o dashboard.
       </div>
     );
@@ -46,14 +46,14 @@ export default function DashboardView({ dashboard }: { dashboard: DashboardSumma
         <div className="min-h-[280px] w-full min-w-0 overflow-hidden max-[520px]:min-h-[240px]">
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={trend} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d9e0e6" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-line)" />
               <XAxis dataKey="label" />
               <YAxis allowDecimals={false} />
               <Tooltip
                 formatter={(value) => [value, "Almoços"]}
                 contentStyle={{ background: "#20262c", color: "#fff", border: "none", borderRadius: 8 }}
               />
-              <Line type="monotone" dataKey="quantity" stroke="#2BA8A2" strokeWidth={3} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="quantity" stroke="var(--color-teal)" strokeWidth={3} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -66,14 +66,14 @@ export default function DashboardView({ dashboard }: { dashboard: DashboardSumma
         <div className="min-h-[280px] w-full min-w-0 overflow-hidden max-[520px]:min-h-[240px]">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={dashboard.current.employeeTotals.slice(0, 8)} layout="vertical" margin={{ top: 5, right: 20, left: 48, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d9e0e6" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-line)" />
               <XAxis type="number" allowDecimals={false} />
               <YAxis type="category" dataKey="employeeName" width={92} />
               <Tooltip
                 formatter={(value) => [value, "Almoços"]}
                 contentStyle={{ background: "#20262c", color: "#fff", border: "none", borderRadius: 8 }}
               />
-              <Bar dataKey="quantity" fill="#1E8C86" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="quantity" fill="var(--color-teal-deep)" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

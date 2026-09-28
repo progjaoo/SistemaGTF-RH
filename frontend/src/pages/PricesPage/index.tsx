@@ -171,7 +171,7 @@ export default function PricesPage({
             value={scopeFilter}
             onChange={(event) => setScopeFilter(event.target.value)}
             aria-label="Filtrar por escopo"
-            className="min-h-10 rounded-lg border border-line bg-white px-[10px] text-ink"
+            className="min-h-10 rounded-lg border border-line bg-surface px-[10px] text-ink"
           >
             <option value="">Todos os escopos</option>
             <option value="global">Global</option>
@@ -181,7 +181,7 @@ export default function PricesPage({
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
             aria-label="Filtrar por status"
-            className="min-h-10 rounded-lg border border-line bg-white px-[10px] text-ink"
+            className="min-h-10 rounded-lg border border-line bg-surface px-[10px] text-ink"
           >
             <option value="">Todos os status</option>
             <option value="VIGENTE">Vigentes</option>
@@ -241,7 +241,7 @@ export default function PricesPage({
               type="date"
               value={endDate}
               onChange={(event) => setEndDate(event.target.value)}
-              className="min-h-10 w-full rounded-lg border border-line bg-white px-[10px] text-ink"
+              className="min-h-10 w-full rounded-lg border border-line bg-surface px-[10px] text-ink"
             />
           </div>
           <DialogFooter>

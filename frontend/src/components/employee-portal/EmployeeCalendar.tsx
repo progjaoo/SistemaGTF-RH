@@ -117,7 +117,7 @@ export function EmployeeCalendar({
         <button
           type="button"
           onClick={onBack}
-          className="min-h-[38px] rounded-lg border border-line bg-white px-[10px] py-2 font-extrabold text-teal-deep"
+          className="min-h-[38px] rounded-lg border border-line bg-surface px-[10px] py-2 font-extrabold text-teal-deep"
         >
           Trocar nome
         </button>
@@ -127,7 +127,7 @@ export function EmployeeCalendar({
       {error && <div className="rounded-lg border border-danger/30 bg-danger/5 px-[10px] py-[10px] font-extrabold text-danger-ink">{error}</div>}
 
       {loading ? (
-        <div className="rounded-lg border border-dashed border-line bg-white/70 p-7 text-muted">Carregando calendário...</div>
+        <div className="rounded-lg border border-dashed border-line bg-surface/70 p-7 text-muted">Carregando calendário...</div>
       ) : (
         <>
           <div className="grid justify-items-center">

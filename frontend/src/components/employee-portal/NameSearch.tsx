@@ -42,7 +42,7 @@ export function NameSearch({
             placeholder="Digite parte do seu nome"
             autoComplete="name"
             required
-            className="min-h-10 w-full rounded-lg border border-line bg-white px-[10px] py-2 text-ink focus:border-teal focus:outline-none"
+            className="min-h-10 w-full rounded-lg border border-line bg-surface px-[10px] py-2 text-ink focus:border-teal focus:outline-none"
           />
         </div>
         <Button type="submit" disabled={loading}>
@@ -61,7 +61,7 @@ export function NameSearch({
               key={employee.id}
               type="button"
               onClick={() => onSelect(employee)}
-              className="min-h-[46px] w-full rounded-lg border border-line bg-white px-3 py-[10px] text-left font-extrabold text-ink hover:border-teal/40 hover:bg-teal-bg"
+              className="min-h-[46px] w-full rounded-lg border border-line bg-surface px-3 py-[10px] text-left font-extrabold text-ink hover:border-teal/40 hover:bg-teal-bg"
             >
               {employee.name}
             </button>
