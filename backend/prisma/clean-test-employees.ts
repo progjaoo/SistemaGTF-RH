@@ -28,6 +28,11 @@ const TEST_NAMES = [
   "Roberto Lima"
 ] as const;
 
+// PURGE=1: apaga TUDO do funcionário de teste (lançamentos, preços
+// individuais e o cadastro) — preparo de banco para produção. Sem PURGE:
+// apaga só sem histórico, senão inativa (preserva histórico).
+const PURGE = process.env.PURGE === "1";
+
 async function main() {
   const testNormalized = new Set(TEST_NAMES.map(normalizeName));
 
@@ -44,6 +49,23 @@ async function main() {
     const mealCount = await prisma.mealRecord.count({
       where: { employeeId: employee.id }
     });
+    if (PURGE) {
+      await prisma.mealRecord.deleteMany({ where: { employeeId: employee.id } });
+      await prisma.mealPrice.deleteMany({ where: { employeeId: employee.id } });
+      await prisma.pushSubscription.deleteMany({ where: { employeeId: employee.id } });
+      await prisma.employee.delete({ where: { id: employee.id } });
+      await prisma.auditLog.create({
+        data: {
+          entity: "Employee",
+          entityId: employee.id,
+          action: "CLEANUP_EMPLOYEE_PURGE",
+          metadata: { name: employee.name, mealRecords: mealCount }
+        }
+      });
+      deleted.push(`${employee.name} (${mealCount} registros purgados)`);
+      console.log(`Purgado (banco p/ produção): ${employee.name} (${mealCount} registros)`);
+      continue;
+    }
     if (mealCount === 0) {
       await prisma.employee.delete({ where: { id: employee.id } });
       await prisma.auditLog.create({
