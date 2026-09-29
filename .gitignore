@@ -10,3 +10,5 @@ coverage/
 agents/
 docs/
 backend/prisma/migrations/*/migration_lock.toml
+.neon
+.vercel/

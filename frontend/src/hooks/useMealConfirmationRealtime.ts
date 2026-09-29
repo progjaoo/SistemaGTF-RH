@@ -37,6 +37,13 @@ export function useMealConfirmationRealtime({
       socket.emit("period:join", periodId);
     });
 
+    // Sem Socket.IO no backend (ex.: serverless na Vercel), a conexão
+    // falha de cara — desconecta em vez de insistir nos 5 retries.
+    // A tela segue funcional via refetch manual/nas ações.
+    socket.on("connect_error", () => {
+      socket.disconnect();
+    });
+
     socket.on("meal-confirmation:updated", (payload: MealConfirmationRealtimePayload) => {
       if (payload.periodId === periodId) onConfirmationRef.current(payload);
     });

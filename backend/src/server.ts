@@ -11,6 +11,7 @@ import { openApiDocument } from "./docs/openapi.js";
 import { authRouter } from "./routes/auth.js";
 import { billingPeriodsRouter } from "./routes/billing-periods.js";
 import { dashboardRouter } from "./routes/dashboard.js";
+import { cronRouter } from "./routes/cron.js";
 import { employeePortalRouter } from "./routes/employee-portal.js";
 import { employeesRouter } from "./routes/employees.js";
 import { mealPricesRouter } from "./routes/meal-prices.js";
@@ -22,10 +23,9 @@ import { startLunchReminderScheduler } from "./services/push.js";
 
 const app = express();
 
-// Atrás do Nginx (loopback), o IP real vem do X-Forwarded-For.
-// "loopback" confia apenas em 127.0.0.1/::1 — necessário para o
-// rate-limit e os logs de abuso enxergarem o IP verdadeiro.
-app.set("trust proxy", "loopback");
+// Na Vercel há 1 hop de proxy (edge) até a function: o IP real do cliente
+// vem no X-Forwarded-For. Local/Docker mantém "loopback" (só Nginx local).
+app.set("trust proxy", process.env.VERCEL ? 1 : "loopback");
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -64,6 +64,7 @@ app.use("/api/meal-prices", mealPricesRouter);
 app.use("/api/meal-records", mealRecordsRouter);
 app.use("/api/billing-periods", billingPeriodsRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/cron", cronRouter);
 app.use("/api/reports", reportsRouter);
 
 function isPrismaRuntimeError(error: unknown) {
