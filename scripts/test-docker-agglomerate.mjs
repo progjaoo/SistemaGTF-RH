@@ -316,6 +316,15 @@ async function run() {
     method: "DELETE",
     headers: { Authorization: `Bearer ${rhToken}` },
   });
+  // O DELETE da API só inativa; remove a linha para não poluir a base.
+  try {
+    execSync(`docker exec -i sistema-rh-pg-test psql -U postgres -d sistema_rh -c "DELETE FROM \\"Employee\\" WHERE id = '${testEmpId}';"`, { stdio: "ignore" });
+  } catch (e) {}
+  const leftover = await request(`/employees?search=Funcionario Teste Docker`, {
+    headers: { Authorization: `Bearer ${rhToken}` },
+  });
+  const stillThere = (leftover.data?.employees ?? []).some((e) => e.id === testEmpId);
+  assert(!stillThere, "Limpeza: funcionário de teste deste run removido");
 
   // -----------------------------------------------------------------
   // 5. Períodos e Relatórios (JSON, Excel e PDF)

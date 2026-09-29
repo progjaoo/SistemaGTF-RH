@@ -58,10 +58,10 @@ export class ApiError extends Error {
 }
 
 export const api = {
-  login(email: string, password: string) {
+  login(email: string, password: string, remember = false) {
     return request<Session>("/auth/login", undefined, {
       method: "POST",
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, remember })
     });
   },
   employees(token: string) {

@@ -57,7 +57,7 @@ billingPeriodsRouter.get("/", asyncHandler(async (_req, res) => {
   res.json({ periods: periods.map(serializePeriod) });
 }));
 
-billingPeriodsRouter.post("/", requireRole(Role.RH), asyncHandler(async (req, res) => {
+billingPeriodsRouter.post("/", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const input = periodSchema.parse(req.body);
   const startDate = parseDate(input.startDate);
@@ -91,7 +91,7 @@ const bulkYearSchema = z.object({
 // Gera os 12 períodos mensais de um ano de uma vez (RH).
 // Atômico: qualquer sobreposição com período existente aborta tudo (409)
 // listando os conflitos — nada é criado.
-billingPeriodsRouter.post("/bulk-year", requireRole(Role.RH), asyncHandler(async (req, res) => {
+billingPeriodsRouter.post("/bulk-year", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const input = bulkYearSchema.parse(req.body);
   const planned = buildYearPeriods(input.year, input.cutDay, input.labelPrefix);
@@ -139,7 +139,7 @@ billingPeriodsRouter.post("/bulk-year", requireRole(Role.RH), asyncHandler(async
   res.status(201).json({ periods: created.map(serializePeriod) });
 }));
 
-billingPeriodsRouter.post("/:id/close", requireRole(Role.RH), asyncHandler(async (req, res) => {
+billingPeriodsRouter.post("/:id/close", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const period = await prisma.billingPeriod.findUnique({ where: { id: req.params.id } });
 
@@ -175,7 +175,7 @@ billingPeriodsRouter.post("/:id/close", requireRole(Role.RH), asyncHandler(async
   res.json({ period: serializePeriod(closed), summary });
 }));
 
-billingPeriodsRouter.post("/:id/reopen", requireRole(Role.RH), asyncHandler(async (req, res) => {
+billingPeriodsRouter.post("/:id/reopen", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const period = await prisma.billingPeriod.findUnique({ where: { id: req.params.id } });
 

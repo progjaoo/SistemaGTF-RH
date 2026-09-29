@@ -77,7 +77,7 @@ export default function App() {
         api.periods(currentSession.token),
         api.employees(currentSession.token),
         api.mealPrices(currentSession.token),
-        currentSession.user.role === "RH" ? api.users(currentSession.token) : Promise.resolve({ users: [] })
+        currentSession.user.role === "RH" || currentSession.user.role === "ADMIN" ? api.users(currentSession.token) : Promise.resolve({ users: [] })
       ]);
 
       setPeriods(periodResponse.periods);
@@ -136,7 +136,7 @@ export default function App() {
     );
   }
 
-  const isRh = session.user.role === "RH";
+  const canManage = session.user.role === "RH" || session.user.role === "ADMIN";
   const tabs = ([
     { id: "dashboard", label: "Dashboard", icon: <WalletCards size={18} /> },
     { id: "records", label: "Lançamentos", icon: <Soup size={18} /> },
@@ -145,7 +145,7 @@ export default function App() {
     { id: "prices", label: "Preços", icon: <WalletCards size={18} />, rhOnly: true },
     { id: "periods", label: "Períodos", icon: <CalendarCheck size={18} />, rhOnly: true },
     { id: "users", label: "Usuários", icon: <ShieldCheck size={18} />, rhOnly: true }
-  ] satisfies NavigationTab[]).filter((tab) => !tab.rhOnly || isRh);
+  ] satisfies NavigationTab[]).filter((tab) => !tab.rhOnly || canManage);
 
   return (
     <SidebarProvider
@@ -235,7 +235,7 @@ export default function App() {
         {activeTab === "employees" && (
           <EmployeesPage
             employees={employees}
-            canEdit={isRh}
+            canEdit={canManage}
             token={session.token}
             onSave={async (payload, id) => {
               await api.saveEmployee(session.token, payload, id);
@@ -252,7 +252,7 @@ export default function App() {
             }}
           />
         )}
-        {activeTab === "prices" && isRh && (
+        {activeTab === "prices" && canManage && (
           <PricesPage
             token={session.token}
             prices={prices}
@@ -262,7 +262,7 @@ export default function App() {
             }}
           />
         )}
-        {activeTab === "periods" && isRh && (
+        {activeTab === "periods" && canManage && (
           <PeriodsPage
             periods={periods}
             token={session.token}
@@ -287,7 +287,7 @@ export default function App() {
             }}
           />
         )}
-        {activeTab === "users" && isRh && (
+        {activeTab === "users" && canManage && (
           <UsersPage
             users={users}
             onSave={async (payload, id) => {

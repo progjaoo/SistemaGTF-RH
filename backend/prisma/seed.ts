@@ -59,6 +59,22 @@ async function main() {
     }
   });
 
+  await prisma.user.upsert({
+    where: { email: "admin@grupogtf.com.br" },
+    update: {
+      name: "Administrador",
+      passwordHash,
+      role: Role.ADMIN,
+      active: true
+    },
+    create: {
+      name: "Administrador",
+      email: "admin@grupogtf.com.br",
+      passwordHash,
+      role: Role.ADMIN
+    }
+  });
+
   const employeeSeeds = [
     ["11111111-1111-4111-8111-111111111111", "Maria Eduarda", ScheduleType.MON_FRI],
     ["22222222-2222-4222-8222-222222222222", "Dario Santos", ScheduleType.MON_FRI],
@@ -155,7 +171,7 @@ async function main() {
       entity: "Seed",
       action: "INITIAL_DATA",
       metadata: {
-        users: ["rh@grupogtf.com.br", "gestora@grupogtf.com.br", "ti@grupogtf.com.br"],
+        users: ["rh@grupogtf.com.br", "gestora@grupogtf.com.br", "ti@grupogtf.com.br", "admin@grupogtf.com.br"],
         password: "Conquistas@07"
       }
     }

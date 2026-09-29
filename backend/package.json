@@ -13,7 +13,8 @@
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
     "seed:employees:gtf": "tsx prisma/seed-employees-grupo-gtf.ts",
-    "sync:employees:gtf": "tsx prisma/sync-employees-gtf.ts"
+    "sync:employees:gtf": "tsx prisma/sync-employees-gtf.ts",
+    "clean:test-employees": "tsx prisma/clean-test-employees.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.10.1",

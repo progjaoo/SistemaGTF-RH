@@ -3,9 +3,10 @@ import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logoGtf from "../../images/logogtf.png";
 
-export default function LoginPage({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
+export default function LoginPage({ onLogin }: { onLogin: (email: string, password: string, remember?: boolean) => Promise<void> }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -14,7 +15,7 @@ export default function LoginPage({ onLogin }: { onLogin: (email: string, passwo
     setSubmitting(true);
     setError("");
     try {
-      await onLogin(email, password);
+      await onLogin(email, password, remember);
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : "Não foi possível entrar.");
     } finally {
@@ -69,6 +70,17 @@ export default function LoginPage({ onLogin }: { onLogin: (email: string, passwo
             </div>
 
             {error && <div role="alert" className="rounded-[10px] border border-danger/30 bg-danger/5 px-[14px] py-3 text-[0.92rem] font-bold text-danger-ink">{error}</div>}
+
+            <label className="flex cursor-pointer items-center gap-2 text-[0.92rem] font-semibold text-[#5b6b7c]">
+              <input
+                id="remember"
+                type="checkbox"
+                checked={remember}
+                onChange={(event) => setRemember(event.target.checked)}
+                className="h-4 w-4 accent-teal"
+              />
+              Manter conectado neste aparelho
+            </label>
 
             <Button type="submit" variant="primary" size="lg" disabled={submitting} className="mt-2 w-full text-base">
               <ShieldCheck size={18} />

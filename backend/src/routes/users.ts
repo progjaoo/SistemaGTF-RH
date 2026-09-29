@@ -8,7 +8,7 @@ import { authenticate, requireRole, type AuthenticatedRequest } from "../middlew
 
 export const usersRouter = express.Router();
 
-usersRouter.use(authenticate, requireRole(Role.RH));
+usersRouter.use(authenticate, requireRole(Role.RH, Role.ADMIN));
 
 const userSchema = z.object({
   name: z.string().min(2),

@@ -12,7 +12,8 @@ export const authRouter = express.Router();
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(1)
+  password: z.string().min(1),
+  remember: z.boolean().optional().default(false)
 });
 
 authRouter.post("/login", loginLimiter, asyncHandler(async (req, res) => {
@@ -28,7 +29,9 @@ authRouter.post("/login", loginLimiter, asyncHandler(async (req, res) => {
     return res.status(401).json({ message: "E-mail ou senha inválidos." });
   }
 
-  const token = jwt.sign({ sub: user.id, role: user.role }, config.jwtSecret, { expiresIn: "12h" });
+  const token = jwt.sign({ sub: user.id, role: user.role }, config.jwtSecret, {
+    expiresIn: input.remember ? "30d" : "12h"
+  });
 
   await prisma.auditLog.create({
     data: { actorId: user.id, entity: "User", entityId: user.id, action: "LOGIN" }

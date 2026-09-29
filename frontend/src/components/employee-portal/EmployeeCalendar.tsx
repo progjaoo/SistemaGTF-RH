@@ -64,11 +64,11 @@ export function EmployeeCalendar({
   onBack: () => void;
 }) {
   const today = dateKeyInSaoPaulo();
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(month === currentMonth ? today : null);
 
   useEffect(() => {
-    setSelectedKey(null);
-  }, [month, employee.id]);
+    setSelectedKey(month === currentMonth ? today : null);
+  }, [month, currentMonth, employee.id, today]);
 
   useEffect(() => {
     const handler = () => { void (async () => {

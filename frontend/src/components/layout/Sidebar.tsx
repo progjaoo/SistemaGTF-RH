@@ -110,7 +110,7 @@ export function Sidebar({
             <div className="grid gap-3">
               <div><p className="text-[0.82rem] font-bold text-muted">Nome</p><p className="font-bold">{user.name}</p></div>
               <div><p className="text-[0.82rem] font-bold text-muted">E-mail</p><p className="font-bold wrap-anywhere">{user.email}</p></div>
-              <div><p className="text-[0.82rem] font-bold text-muted">Perfil</p><p className="font-bold">{user.role === "RH" ? "RH" : "Gestora"}</p></div>
+              <div><p className="text-[0.82rem] font-bold text-muted">Perfil</p><p className="font-bold">{user.role === "RH" ? "RH" : user.role === "ADMIN" ? "Admin" : "Gestora"}</p></div>
             </div>
           </DialogContent>
         </Dialog>

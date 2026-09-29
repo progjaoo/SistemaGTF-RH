@@ -1,4 +1,4 @@
-export type Role = "RH" | "GESTORA";
+export type Role = "RH" | "GESTORA" | "ADMIN";
 export type EmployeeStatus = "ACTIVE" | "INACTIVE";
 export type ScheduleType = "MON_FRI" | "MON_SUN" | "CUSTOM";
 export type BillingStatus = "OPEN" | "CLOSED";

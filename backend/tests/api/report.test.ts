@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../../src/server.js";
-import { cleanup, createEmployee, createPeriod, createPrice, createUser, d } from "../helpers.js";
+import { cleanup, createEmployee, createPeriod, createPrice, createUser, d, pdfTextOf } from "../helpers.js";
 import { prisma } from "../../src/lib/prisma.js";
 
 const TAG = "report";
@@ -121,6 +121,29 @@ describe("billing-periods/:id/report", () => {
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toContain("application/pdf");
     expect((res.body as Buffer).subarray(0, 4).toString()).toBe("%PDF");
+  });
+
+  it("PDF profissional PLAN-013 Task 5: faixa Genesis, label, nome e Total geral", async () => {
+    const res = await request(app).get(`/api/billing-periods/${periodId}/report?format=pdf`)
+      .set("Authorization", `Bearer ${rhToken}`).buffer(true)
+      .parse((r, cb) => {
+        const chunks: Buffer[] = [];
+        r.on("data", (c) => chunks.push(c as Buffer));
+        r.on("end", () => cb(null, Buffer.concat(chunks)));
+      });
+    expect(res.status).toBe(200);
+    const buf = res.body as Buffer;
+    expect(buf.subarray(0, 4).toString()).toBe("%PDF");
+    // Faixa de identidade maior que o cabeçalho simples anterior.
+    expect(buf.length).toBeGreaterThan(2500);
+    const text = pdfTextOf(buf);
+    expect(text).toContain("GTF");
+    expect(text).toContain("Fechamento de Folha");
+    expect(text).toContain("Período report");
+    expect(text).toContain("Func report");
+    expect(text).toContain("Total geral");
+    expect(text).toContain("R$ 20,00");
+    expect(text).toContain("colaborador");
   });
 
   it("HTML traz prévia com os mesmos totais", async () => {

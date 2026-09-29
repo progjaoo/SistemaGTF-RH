@@ -2,7 +2,7 @@
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../../src/server.js";
-import { cleanup, createEmployee, createPeriod, createPrice, createUser, d } from "../helpers.js";
+import { cleanup, createEmployee, createPeriod, createPrice, createUser, d, pdfTextOf } from "../helpers.js";
 import { prisma } from "../../src/lib/prisma.js";
 
 const TAG = "rreport";
@@ -102,6 +102,22 @@ describe("reports por intervalo", () => {
     expect(res.headers["content-type"]).toContain("application/pdf");
     expect(res.headers["content-disposition"]).toContain("relatorio_20210830_a_20210902.pdf");
     expect((res.body as Buffer).subarray(0, 4).toString()).toBe("%PDF");
+  });
+
+  it("PDF profissional PLAN-013 Task 5: faixa Genesis, intervalo, nome e Total geral", async () => {
+    const res = await request(app).get(rangeUrl("?start=2021-08-30&end=2021-09-02&format=pdf"))
+      .set("Authorization", `Bearer ${rhToken}`).buffer(true).parse(asBuffer);
+    expect(res.status).toBe(200);
+    const buf = res.body as Buffer;
+    expect(buf.subarray(0, 4).toString()).toBe("%PDF");
+    expect(buf.length).toBeGreaterThan(2500);
+    const text = pdfTextOf(buf);
+    expect(text).toContain("GTF");
+    expect(text).toContain("Fechamento de Folha");
+    expect(text).toContain("30/08/2021 a 02/09/2021");
+    expect(text).toContain("Func rreport");
+    expect(text).toContain("Total geral");
+    expect(text).toContain("R$ 20,00");
   });
 
   it("HTML traz prévia do intervalo", async () => {

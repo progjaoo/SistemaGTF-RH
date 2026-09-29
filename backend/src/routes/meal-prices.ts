@@ -91,7 +91,7 @@ mealPricesRouter.get("/", asyncHandler(async (_req, res) => {
   res.json({ prices: prices.map(serializePrice) });
 }));
 
-mealPricesRouter.post("/", requireRole(Role.RH), asyncHandler(async (req, res) => {
+mealPricesRouter.post("/", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const input = priceSchema.parse(req.body);
   const validFrom = parseDate(input.validFrom);
@@ -122,7 +122,7 @@ mealPricesRouter.post("/", requireRole(Role.RH), asyncHandler(async (req, res) =
   res.status(201).json({ price: serializePrice(price) });
 }));
 
-mealPricesRouter.put("/:id", requireRole(Role.RH), asyncHandler(async (req, res) => {
+mealPricesRouter.put("/:id", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const input = priceSchema.parse(req.body);
   const existing = await prisma.mealPrice.findUnique({ where: { id: req.params.id } });
@@ -164,7 +164,7 @@ mealPricesRouter.put("/:id", requireRole(Role.RH), asyncHandler(async (req, res)
 }));
 
 // Encerra a vigência sem apagar (histórico de relatórios fechados intacto).
-mealPricesRouter.post("/:id/close", requireRole(Role.RH), asyncHandler(async (req, res) => {
+mealPricesRouter.post("/:id/close", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const input = z.object({ endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato YYYY-MM-DD.") }).parse(req.body);
   const existing = await prisma.mealPrice.findUnique({ where: { id: req.params.id } });
