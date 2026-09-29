@@ -3,11 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import { DayPicker, type DayButtonProps } from "react-day-picker";
 import "react-day-picker/style.css";
 import { ptBR } from "date-fns/locale";
-import styled from "styled-components";
 import type { ConfirmationStatus, EmployeePortalDay, EmployeePortalSearchResult } from "../../types";
+import { api } from "../../api";
 import { dateKeyInSaoPaulo } from "../../utils/date";
-import { EmptyState } from "../ui";
+import { subscribeForLunchReminders } from "../../utils/push";
+import { cn } from "@/lib/utils";
 import { DayCheckin } from "./DayCheckin";
+import { PushReminderToggle } from "./PushReminderToggle";
 
 function parseKey(key: string) {
   const [year, month, day] = key.split("-").map(Number);
@@ -38,6 +40,7 @@ function LaunchDayButton(props: DayButtonProps) {
 
 export function EmployeeCalendar({
   employee,
+  portalToken,
   month,
   currentMonth,
   days,
@@ -49,6 +52,7 @@ export function EmployeeCalendar({
   onBack
 }: {
   employee: EmployeePortalSearchResult;
+  portalToken: string;
   month: string;
   currentMonth: string;
   days: EmployeePortalDay[];
@@ -60,11 +64,24 @@ export function EmployeeCalendar({
   onBack: () => void;
 }) {
   const today = dateKeyInSaoPaulo();
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(month === currentMonth ? today : null);
 
   useEffect(() => {
-    setSelectedKey(null);
-  }, [month, employee.id]);
+    setSelectedKey(month === currentMonth ? today : null);
+  }, [month, currentMonth, employee.id, today]);
+
+  useEffect(() => {
+    const handler = () => { void (async () => {
+      try {
+        if (Notification.permission !== "default") return;
+        const { publicKey } = await api.pushVapidKey(portalToken, employee.id);
+        const json = await subscribeForLunchReminders(publicKey);
+        await api.pushSubscribe(portalToken, employee.id, json);
+      } catch { /* silencioso: o botão cobre */ }
+    })(); };
+    window.addEventListener("appinstalled", handler);
+    return () => window.removeEventListener("appinstalled", handler);
+  }, [employee.id, portalToken]);
 
   const byDate = useMemo(() => new Map(days.map((day) => [day.date, day])), [days]);
 
@@ -88,25 +105,32 @@ export function EmployeeCalendar({
   const endMonth = useMemo(() => parseKey(`${currentMonth}-01`), [currentMonth]);
 
   return (
-    <CalendarPanel>
-      <CalendarHeader>
-        <EmployeeTitle>
-          <UserRound size={22} />
+    <section className="portal-calendar grid w-[min(760px,100%)] gap-4 rounded-lg border border-line bg-surface p-5 shadow-[0_18px_48px_rgb(32_38_44/0.08)]">
+      <div className="flex items-center justify-between gap-3 max-[520px]:flex-col max-[520px]:items-start">
+        <div className="flex items-center gap-[10px]">
+          <UserRound size={22} className="text-teal-deep" />
           <div>
-            <span>Colaborador</span>
-            <strong>{employee.name}</strong>
+            <span className="block text-[0.78rem] font-extrabold uppercase text-muted">Colaborador</span>
+            <strong className="block text-[1.25rem]">{employee.name}</strong>
           </div>
-        </EmployeeTitle>
-        <button type="button" onClick={onBack}>Trocar nome</button>
-      </CalendarHeader>
+        </div>
+        <button
+          type="button"
+          onClick={onBack}
+          className="min-h-10 rounded-lg border border-line bg-surface px-[10px] py-2 font-extrabold text-teal-deep"
+        >
+          Trocar nome
+        </button>
+      </div>
+      <PushReminderToggle employeeId={employee.id} portalToken={portalToken} />
 
-      {error && <CalendarError>{error}</CalendarError>}
+      {error && <div className="rounded-lg border border-danger/30 bg-danger/5 px-[10px] py-[10px] font-extrabold text-danger-ink">{error}</div>}
 
       {loading ? (
-        <EmptyState>Carregando calendário...</EmptyState>
+        <div className="rounded-lg border border-dashed border-line bg-surface/70 p-7 text-muted">Carregando calendário...</div>
       ) : (
         <>
-          <MonthGrid>
+          <div className="grid justify-items-center">
             <DayPicker
               mode="single"
               locale={ptBR}
@@ -128,163 +152,22 @@ export function EmployeeCalendar({
               }}
               components={{ DayButton: LaunchDayButton }}
             />
-          </MonthGrid>
-          <Legend>
+          </div>
+          <div className="flex flex-wrap gap-3 text-[0.82rem] font-bold text-muted [&>span]:inline-flex [&>span]:items-center [&>span]:gap-[6px]">
             <span><i className="dot dot-pending" /> A confirmar</span>
             <span><i className="dot dot-late" /> Atrasado</span>
             <span><i className="dot dot-confirmed" /> Confirmado</span>
             <span><i className="dot dot-closed" /> Período fechado</span>
-          </Legend>
+          </div>
           <DayCheckin
             day={selectedDay}
+            selectedDate={selectedKey}
             today={today}
-            saving={selectedDay ? savingDate === selectedDay.date : false}
+            saving={!!selectedKey && savingDate === selectedKey}
             onCheckin={onCheckin}
           />
         </>
       )}
-    </CalendarPanel>
+    </section>
   );
 }
-
-const CalendarPanel = styled.section`
-  display: grid;
-  gap: 16px;
-  width: min(760px, 100%);
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-
-  .rdp-root {
-    --rdp-accent-color: var(--teal);
-    --rdp-accent-background-color: var(--teal-soft);
-    --rdp-day-height: 44px;
-    --rdp-day-width: 44px;
-    margin: 0 auto;
-  }
-
-  .rdp-day_button {
-    position: relative;
-    min-height: 44px;
-    min-width: 44px;
-    border-radius: 8px;
-    font-weight: 800;
-
-    .dot {
-      position: absolute;
-      left: 50%;
-      bottom: 5px;
-      transform: translateX(-50%);
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-    }
-  }
-
-  .day-late .rdp-day_button {
-    border: 1px solid #f59e0b;
-  }
-
-  .day-closed .rdp-day_button {
-    color: var(--muted);
-  }
-
-  .dot-pending {
-    background: var(--amber, #f59e0b);
-  }
-
-  .dot-late {
-    background: #dc2626;
-  }
-
-  .dot-confirmed {
-    background: var(--teal);
-  }
-
-  .dot-closed {
-    background: #9ca3af;
-  }
-
-  .dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-  }
-`;
-
-const CalendarHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-
-  > button {
-    min-height: 38px;
-    padding: 8px 10px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: #fff;
-    color: var(--teal);
-    font-weight: 850;
-  }
-
-  @media (max-width: 520px) {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-`;
-
-const EmployeeTitle = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  svg {
-    color: var(--teal);
-  }
-
-  span {
-    display: block;
-    color: var(--muted);
-    font-size: 0.78rem;
-    font-weight: 800;
-    text-transform: uppercase;
-  }
-
-  strong {
-    display: block;
-    font-size: 1.25rem;
-  }
-`;
-
-const MonthGrid = styled.div`
-  display: grid;
-  justify-items: center;
-`;
-
-const Legend = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 750;
-
-  span {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-`;
-
-const CalendarError = styled.div`
-  padding: 10px 12px;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  background: #fff1f2;
-  color: #b91c1c;
-  font-weight: 800;
-`;

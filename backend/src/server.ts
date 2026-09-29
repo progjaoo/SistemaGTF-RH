@@ -15,8 +15,10 @@ import { employeePortalRouter } from "./routes/employee-portal.js";
 import { employeesRouter } from "./routes/employees.js";
 import { mealPricesRouter } from "./routes/meal-prices.js";
 import { mealRecordsRouter } from "./routes/meal-records.js";
+import { reportsRouter } from "./routes/reports.js";
 import { usersRouter } from "./routes/users.js";
 import { initRealtime } from "./realtime.js";
+import { startLunchReminderScheduler } from "./services/push.js";
 
 const app = express();
 
@@ -62,6 +64,7 @@ app.use("/api/meal-prices", mealPricesRouter);
 app.use("/api/meal-records", mealRecordsRouter);
 app.use("/api/billing-periods", billingPeriodsRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/reports", reportsRouter);
 
 function isPrismaRuntimeError(error: unknown) {
   if (!(error instanceof Error)) return false;
@@ -117,4 +120,7 @@ if (isDirectRun) {
       console.error("Realtime indisponível:", error);
     });
   });
+  if (process.env.NODE_ENV !== "test") {
+    startLunchReminderScheduler();
+  }
 }

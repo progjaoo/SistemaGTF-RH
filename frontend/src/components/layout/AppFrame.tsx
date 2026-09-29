@@ -1,79 +1,36 @@
-import styled from "styled-components";
+import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
-export const Shell = styled.div<{ $collapsed: boolean }>`
-  display: grid;
-  grid-template-columns: ${({ $collapsed }) => ($collapsed ? "96px" : "280px")} minmax(0, 1fr);
-  min-height: 100vh;
-  transition: grid-template-columns 0.22s ease;
+export function Shell({ collapsed, children }: { collapsed: boolean; children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "grid min-h-[100dvh] transition-[grid-template-columns] duration-200",
+        collapsed ? "grid-cols-[96px_minmax(0,1fr)]" : "grid-cols-[280px_minmax(0,1fr)]",
+        "max-[900px]:grid-cols-1"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
-  @media (max-width: 900px) {
-    grid-template-columns: 1fr;
-  }
-`;
+export function Main({ children }: { children: ReactNode }) {
+  return <main className="min-w-0 p-7 max-[700px]:px-3 max-[700px]:py-[14px] max-[700px]:pb-[18px]">{children}</main>;
+}
 
-export const Main = styled.main`
-  min-width: 0;
-  padding: 28px;
-  transition: padding 0.2s ease;
+export function Topbar({ children }: { children: ReactNode }) {
+  return <header className="mb-5 flex justify-between gap-[18px] max-[820px]:mb-[14px] max-[820px]:flex-col max-[820px]:gap-3">{children}</header>;
+}
 
-  @media (max-width: 700px) {
-    padding: 14px 12px 18px;
-  }
-`;
+export function Eyebrow({ children }: { children: ReactNode }) {
+  return <div className="text-[0.78rem] font-extrabold uppercase text-teal-deep">{children}</div>;
+}
 
-export const Topbar = styled.header`
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 20px;
-
-  h1 {
-    margin: 4px 0 0;
-    font-size: clamp(1.4rem, 2.4vw, 2.4rem);
-    letter-spacing: 0;
-  }
-
-  @media (max-width: 820px) {
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 14px;
-
-    h1 {
-      font-size: 1.35rem;
-      line-height: 1.15;
-      overflow-wrap: anywhere;
-    }
-  }
-`;
-
-export const Eyebrow = styled.div`
-  color: var(--teal);
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-transform: uppercase;
-`;
-
-export const Toolbar = styled.div`
-  display: flex;
-  align-items: start;
-  gap: 10px;
-
-  select {
-    min-width: 230px;
-  }
-
-  @media (max-width: 600px) {
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
-
-    select {
-      width: 100%;
-      min-width: 0;
-    }
-
-    button {
-      width: 100%;
-    }
-  }
-`;
+export function Toolbar({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-[10px] max-[600px]:w-full max-[600px]:flex-col max-[600px]:items-stretch [&>select]:min-w-[230px] max-[600px]:[&>select]:w-full max-[600px]:[&>select]:min-w-0 max-[600px]:[&>button]:w-full">
+      {children}
+    </div>
+  );
+}

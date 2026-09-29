@@ -20,7 +20,8 @@ export const openApiDocument = {
     { name: "Meal Records" },
     { name: "Employee Portal" },
     { name: "Billing Periods" },
-    { name: "Dashboard" }
+    { name: "Dashboard" },
+    { name: "Reports" }
   ],
   components: {
     securitySchemes: {
@@ -105,6 +106,7 @@ export const openApiDocument = {
           value: { type: "number", example: 8.5 },
           validFrom: { type: "string", format: "date", example: "2026-06-01" },
           validTo: { type: "string", format: "date", nullable: true },
+          status: { type: "string", enum: ["VIGENTE", "FUTURA", "ENCERRADA"] },
           employeeId: { type: "string", format: "uuid", nullable: true }
         }
       },
@@ -129,7 +131,7 @@ export const openApiDocument = {
           confirmationStatus: { type: "string", enum: ["PENDING", "PEGUEI", "NAO_PEGUEI"], default: "PENDING" },
           confirmationSource: { type: "string", enum: ["SISTEMA", "WHATSAPP"], nullable: true },
           confirmedAt: { type: "string", format: "date-time", nullable: true },
-          registeredById: { type: "string", format: "uuid" }
+          registeredById: { type: "string", format: "uuid", nullable: true }
         }
       },
       MealRecordBulkInput: {
@@ -377,19 +379,54 @@ export const openApiDocument = {
     "/meal-prices": {
       get: {
         tags: ["Meal Prices"],
-        summary: "Lista preços de almoço",
+        summary: "Lista preços com status de vigência",
         security: [{ bearerAuth: [] }],
-        responses: { "200": { description: "Lista de preços" } }
+        responses: { "200": { description: "Lista de preços (VIGENTE/FUTURA/ENCERRADA)" } }
       },
       post: {
         tags: ["Meal Prices"],
         summary: "Cria preço com vigência",
+        description: "422 se sobrepuser vigência do mesmo escopo.",
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
           content: { "application/json": { schema: { $ref: "#/components/schemas/MealPriceInput" } } }
         },
-        responses: { "201": { description: "Preço criado" } }
+        responses: { "201": { description: "Preço criado" }, "422": { description: "Sobreposição ou vigência inválida" } }
+      }
+    },
+    "/meal-prices/{id}": {
+      put: {
+        tags: ["Meal Prices"],
+        summary: "Edita preço e vigência (RH)",
+        description: "409 se a vigência cruzar período fechado; 422 em sobreposição no mesmo escopo.",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/MealPriceInput" } } }
+        },
+        responses: {
+          "200": { description: "Preço atualizado" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Preço não encontrado" },
+          "409": { description: "Histórico em período fechado" },
+          "422": { description: "Sobreposição ou vigência inválida" }
+        }
+      }
+    },
+    "/meal-prices/{id}/close": {
+      post: {
+        tags: ["Meal Prices"],
+        summary: "Encerra vigência sem apagar (RH)",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          "200": { description: "Vigência encerrada" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Preço não encontrado" },
+          "422": { description: "Data final anterior ao início" }
+        }
       }
     },
     "/meal-records": {
@@ -460,6 +497,45 @@ export const openApiDocument = {
           },
           "422": { $ref: "#/components/responses/ValidationError" }
         }
+      },
+      post: {
+        tags: ["Meal Records"],
+        summary: "Marca confirmação manual (WhatsApp) — RH/gestora",
+        description: "Cria o registro com qtd 1 se não existir, ou sobrescreve a confirmação existente. Origem WHATSAPP. Período precisa estar OPEN.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["employeeId", "date", "status"],
+                properties: {
+                  employeeId: { type: "string", format: "uuid" },
+                  date: { type: "string", format: "date", example: "2026-07-03" },
+                  status: { type: "string", enum: ["PEGUEI", "NAO_PEGUEI"] },
+                  note: { type: "string", maxLength: 500 }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Confirmação registrada",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    confirmation: { $ref: "#/components/schemas/MealRecordConfirmation" }
+                  }
+                }
+              }
+            }
+          },
+          "422": { $ref: "#/components/responses/ValidationError" }
+        }
       }
     },
     "/employee-portal/login": {
@@ -476,7 +552,8 @@ export const openApiDocument = {
                 required: ["employeeId", "code"],
                 properties: {
                   employeeId: { type: "string", format: "uuid" },
-                  code: { type: "string", pattern: "^\\d{6}$", example: "482917" }
+                  code: { type: "string", pattern: "^\\d{6}$", example: "482917" },
+                  remember: { type: "boolean", description: "Manter conectado: token de 30d em vez de 8h" }
                 }
               }
             }
@@ -637,12 +714,31 @@ export const openApiDocument = {
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
-          { name: "format", in: "query", schema: { type: "string", enum: ["xlsx", "pdf"] } }
+          { name: "format", in: "query", schema: { type: "string", enum: ["xlsx", "pdf", "html"] } }
         ],
         responses: {
           "200": {
-            description: "Relatório em JSON ou arquivo XLSX/PDF"
+            description: "Relatório em JSON ou arquivo XLSX/PDF/HTML"
           }
+        }
+      }
+    },
+    "/reports": {
+      get: {
+        tags: ["Reports"],
+        summary: "Gera relatório por intervalo (cruza períodos)",
+        description: "Agrega lançamentos entre start e end (máx. 366 dias) com a mesma regra do report por período (só PEGUEI é faturável).",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "start", in: "query", required: true, schema: { type: "string", format: "date", example: "2021-08-30" } },
+          { name: "end", in: "query", required: true, schema: { type: "string", format: "date", example: "2021-09-02" } },
+          { name: "format", in: "query", schema: { type: "string", enum: ["json", "xlsx", "pdf", "html"], default: "json" } }
+        ],
+        responses: {
+          "200": {
+            description: "Relatório em JSON ou arquivo XLSX/PDF/HTML"
+          },
+          "422": { description: "start > end ou intervalo acima de 366 dias" }
         }
       }
     },

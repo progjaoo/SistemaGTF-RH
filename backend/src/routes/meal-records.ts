@@ -1,12 +1,13 @@
-import { BillingStatus, Prisma } from "@prisma/client";
+import { BillingStatus, EmployeeStatus, Prisma } from "@prisma/client";
 import express from "express";
 import { z } from "zod";
-import { formatDate, isBetween, parseDate } from "../lib/dates.js";
+import { formatDate, isBetween, isExpectedWorkday, parseDate } from "../lib/dates.js";
 import { normalizeSearch } from "../lib/names.js";
 import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { authenticate, type AuthenticatedRequest } from "../middleware/auth.js";
-import { assertNoFutureDates, isFutureDate } from "../services/date-rules.js";
+import { emitMealConfirmationUpdated } from "../realtime.js";
+import { assertNoFutureDates, formatDateKeyInSaoPaulo, isFutureDate } from "../services/date-rules.js";
 import { applyMealEntry, type MealEntryWarning } from "../services/meal-entries.js";
 
 export const mealRecordsRouter = express.Router();
@@ -42,7 +43,7 @@ const serializeRecord = (record: {
   confirmationStatus?: "PENDING" | "PEGUEI" | "NAO_PEGUEI";
   confirmationSource?: "SISTEMA" | "WHATSAPP" | null;
   confirmedAt?: Date | null;
-  registeredById: string;
+  registeredById: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) => ({
@@ -98,6 +99,14 @@ mealRecordsRouter.get("/confirmations", asyncHandler(async (req, res) => {
     ORDER BY mr."date" ASC, e."name" ASC
   `);
 
+  const byDateThenName = (
+    first: { date: string; employeeName: string },
+    second: { date: string; employeeName: string }
+  ) => {
+    if (first.date !== second.date) return first.date.localeCompare(second.date);
+    return first.employeeName.localeCompare(second.employeeName, "pt-BR", { sensitivity: "base" });
+  };
+
   const confirmations = records
     .map((record) => ({
       employeeId: record.employeeId,
@@ -109,12 +118,167 @@ mealRecordsRouter.get("/confirmations", asyncHandler(async (req, res) => {
       confirmationNote: record.confirmationNote,
       confirmedAt: record.confirmedAt?.toISOString() ?? null
     }))
-    .sort((first, second) => {
-      if (first.date !== second.date) return first.date.localeCompare(second.date);
-      return first.employeeName.localeCompare(second.employeeName, "pt-BR", { sensitivity: "base" });
-    });
+    .sort(byDateThenName);
+
+  // Com date: ativos sem record na data entram como PENDING zerado.
+  // Sem date (escopo período): inalterado — dia × funcionário explodiria.
+  if (dateQuery) {
+    const present = new Set(records.map((record) => record.employeeId));
+    const actives = await prisma.employee.findMany({ where: { status: "ACTIVE" } });
+    for (const employee of actives) {
+      if (present.has(employee.id)) continue;
+      confirmations.push({
+        employeeId: employee.id,
+        employeeName: employee.name,
+        date: dateQuery,
+        quantity: 0,
+        confirmationStatus: "PENDING" as const,
+        confirmationSource: null,
+        confirmationNote: null,
+        confirmedAt: null
+      });
+    }
+    confirmations.sort(byDateThenName);
+  }
 
   res.json({ confirmations });
+}));
+
+const confirmationSetSchema = z.object({
+  employeeId: z.string(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato YYYY-MM-DD."),
+  status: z.enum(["PEGUEI", "NAO_PEGUEI"]),
+  note: z.string().trim().max(500).optional()
+});
+
+// Marcação manual RH/gestora (WhatsApp): cria o registro com qtd 1 se não
+// existir, ou sobrescreve a confirmação (gestora corrige; auditoria registra
+// o ator). Período precisa estar OPEN. Emite realtime para a conferência.
+mealRecordsRouter.post("/confirmations", asyncHandler(async (req, res) => {
+  const actor = (req as AuthenticatedRequest).user;
+  const input = confirmationSetSchema.parse(req.body);
+  const date = parseDate(input.date);
+
+  const dayClosed = await prisma.dayClose.findUnique({ where: { date } });
+  if (dayClosed) return res.status(422).json({ message: "Dia fechado para lançamentos. Reabra o dia para editar." });
+
+  if (isFutureDate(date)) {
+    return res.status(422).json({ message: "Não é possível marcar data futura." });
+  }
+
+  const employee = await prisma.employee.findFirst({
+    where: { id: input.employeeId, status: EmployeeStatus.ACTIVE }
+  });
+  if (!employee) return res.status(404).json({ message: "Funcionário não encontrado." });
+
+  const period = await prisma.billingPeriod.findFirst({
+    where: { status: BillingStatus.OPEN, startDate: { lte: date }, endDate: { gte: date } }
+  });
+  if (!period) return res.status(422).json({ message: "Nenhum período aberto para esta data." });
+  if (formatDate(date) < formatDateKeyInSaoPaulo() && !input.note?.trim()) {
+    return res.status(422).json({ message: "Justificativa obrigatória para marcação atrasada." });
+  }
+  const note = input.note?.trim() ? input.note.trim() : null;
+
+  const existing = await prisma.mealRecord.findUnique({
+    where: { employeeId_date: { employeeId: employee.id, date } }
+  });
+
+  const record = existing
+    ? await prisma.mealRecord.update({
+        where: { id: existing.id },
+        data: {
+          confirmationStatus: input.status,
+          confirmationSource: "WHATSAPP",
+          confirmationNote: note,
+          confirmedAt: new Date(),
+          periodId: period.id
+        }
+      })
+    : await prisma.mealRecord.create({
+        data: {
+          employeeId: employee.id,
+          periodId: period.id,
+          date,
+          quantity: 1,
+          confirmationStatus: input.status,
+          confirmationSource: "WHATSAPP",
+          confirmationNote: note,
+          confirmedAt: new Date(),
+          registeredById: actor.id
+        }
+      });
+
+  await prisma.auditLog.create({
+    data: {
+      actorId: actor.id,
+      entity: "MealRecord",
+      entityId: record.id,
+      action: "MANUAL_CONFIRMATION",
+      metadata: { employeeId: employee.id, date: input.date, status: input.status, source: "WHATSAPP", created: !existing }
+    }
+  });
+
+  const confirmation = {
+    employeeId: employee.id,
+    employeeName: employee.name,
+    date: input.date,
+    quantity: record.quantity,
+    confirmationStatus: input.status,
+    confirmationSource: "WHATSAPP" as const,
+    confirmationNote: note,
+    confirmedAt: record.confirmedAt?.toISOString() ?? null
+  };
+  emitMealConfirmationUpdated({ periodId: period.id, confirmation });
+
+  res.json({ confirmation });
+}));
+
+const daySchema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato YYYY-MM-DD.") });
+
+mealRecordsRouter.get("/day-status", asyncHandler(async (req, res) => {
+  const input = daySchema.parse(req.query);
+  const existing = await prisma.dayClose.findUnique({ where: { date: parseDate(input.date) } });
+  res.json({ date: input.date, closed: Boolean(existing) });
+}));
+
+mealRecordsRouter.post("/day-close", asyncHandler(async (req, res) => {
+  const actor = (req as AuthenticatedRequest).user;
+  const input = daySchema.parse(req.body);
+  const date = parseDate(input.date);
+  if (isFutureDate(date)) return res.status(422).json({ message: "Não é possível fechar data futura." });
+  const period = await prisma.billingPeriod.findFirst({
+    where: { status: BillingStatus.OPEN, startDate: { lte: date }, endDate: { gte: date } }
+  });
+  if (!period) return res.status(422).json({ message: "Nenhum período aberto para esta data." });
+  const existing = await prisma.dayClose.findUnique({ where: { date } });
+  if (existing) return res.status(409).json({ message: "Dia já fechado." });
+  const records = await prisma.mealRecord.findMany({
+    where: { date }, include: { employee: { select: { id: true, name: true, status: true, scheduleType: true, workdays: true } } }
+  });
+  const pending = records.filter((r) => r.confirmationStatus === "PENDING").map((r) => r.employee.name);
+  if (pending.length) return res.status(409).json({ message: "Há confirmações pendentes.", pending });
+  const withRecord = new Set(records.map((r) => r.employeeId));
+  const employees = await prisma.employee.findMany({ where: { status: "ACTIVE" } });
+  const missing = employees
+    .filter((e) => !withRecord.has(e.id) && isExpectedWorkday(date, e.scheduleType, e.workdays ?? null))
+    .map((e) => e.name);
+  if (missing.length) return res.status(409).json({ message: "Há colaboradores sem marcação.", missing });
+  const dayClose = await prisma.dayClose.create({
+    data: { date, periodId: period.id, closedById: actor.id }
+  });
+  await prisma.auditLog.create({ data: { actorId: actor.id, entity: "DayClose", entityId: dayClose.id, action: "DAY_CLOSE", metadata: { date: input.date } } });
+  res.status(201).json({ dayClose: { date: input.date, closedAt: dayClose.closedAt } });
+}));
+
+mealRecordsRouter.post("/day-reopen", asyncHandler(async (req, res) => {
+  const actor = (req as AuthenticatedRequest).user;
+  const input = daySchema.parse(req.body);
+  const existing = await prisma.dayClose.findUnique({ where: { date: parseDate(input.date) } });
+  if (!existing) return res.status(404).json({ message: "Dia não está fechado." });
+  await prisma.dayClose.delete({ where: { date: parseDate(input.date) } });
+  await prisma.auditLog.create({ data: { actorId: actor.id, entity: "DayClose", entityId: existing.id, action: "DAY_REOPEN", metadata: { date: input.date } } });
+  res.json({ ok: true });
 }));
 
 mealRecordsRouter.post("/bulk", asyncHandler(async (req, res) => {
@@ -133,6 +297,16 @@ mealRecordsRouter.post("/bulk", asyncHandler(async (req, res) => {
     return res.status(422).json({
       message: "Existem lançamentos com data futura.",
       invalidDates: futureDateValidation.invalidDates
+    });
+  }
+
+  const closedRows = await prisma.dayClose.findMany({
+    where: { date: { in: parsedEntries.map((entry) => entry.dateValue) } }
+  });
+  if (closedRows.length > 0) {
+    return res.status(422).json({
+      message: "Dia fechado para lançamentos. Reabra o dia para editar.",
+      closedDates: closedRows.map((row) => formatDate(row.date)).sort()
     });
   }
 
@@ -222,6 +396,11 @@ mealRecordsRouter.post("/import", asyncHandler(async (req, res) => {
   const preview: ImportPreviewRow[] = [];
   const valid: Array<{ employeeId: string; date: Date; dateLabel: string; quantity: number }> = [];
 
+  const closedRows = await prisma.dayClose.findMany({
+    where: { date: { gte: period.startDate, lte: period.endDate } }
+  });
+  const closedDates = new Set(closedRows.map((row) => formatDate(row.date)));
+
   input.rows.forEach((row, position) => {
     const index = position + 1;
     const base = { index, name: row.name ?? "", date: row.date, quantity: row.quantity };
@@ -240,6 +419,10 @@ mealRecordsRouter.post("/import", asyncHandler(async (req, res) => {
     }
     if (!isBetween(dateValue, period.startDate, period.endDate)) {
       fail(`Data ${row.date} fora do período selecionado.`);
+      return;
+    }
+    if (closedDates.has(row.date)) {
+      fail(`Data ${row.date} em dia fechado.`);
       return;
     }
 

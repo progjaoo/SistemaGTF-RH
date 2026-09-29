@@ -18,6 +18,7 @@ model User {
   updatedAt      DateTime        @updatedAt
   mealRecords    MealRecord[]    @relation("RegisteredBy")
   closedPeriods  BillingPeriod[] @relation("ClosedBy")
+  closedDays     DayClose[]      @relation("DayClosedBy")
   createdPrices  MealPrice[]     @relation("PriceCreatedBy")
   auditLogs      AuditLog[]      @relation("AuditActor")
 }
@@ -25,6 +26,7 @@ model User {
 enum Role {
   RH
   GESTORA
+  ADMIN
 }
 
 model Employee {
@@ -39,12 +41,20 @@ model Employee {
   // 6 dígitos. Null = sem acesso (procure o RH). Nunca expor na API.
   accessCodeHash      String?
   accessCodeUpdatedAt DateTime?
+  // Ativação do portal (PLAN-003): preenchido no primeiro login com código.
+  // Null = pendente (código gerado, nunca usado).
+  firstPortalAccessAt DateTime?
+  // Último login no portal (atualizado a cada login ok). Null = nunca entrou.
+  lastPortalAccessAt DateTime?
+  // Função/cargo do colaborador (editável no CRUD). Null = não informado.
+  jobTitle          String?        @db.VarChar(60)
   admissionDate   DateTime?      @db.Date
   terminationDate DateTime?      @db.Date
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   mealRecords     MealRecord[]
   priceOverrides  MealPrice[]
+  pushSubscriptions PushSubscription[]
 
   @@index([status])
   @@index([name])
@@ -100,8 +110,10 @@ model MealRecord {
   // Justificativa/observação do colaborador (obrigatória em marcação
   // atrasada, opcional no dia). Exibida à gestora na conferência.
   confirmationNote   String?             @db.VarChar(500)
-  registeredById     String              @db.Uuid
-  registeredBy       User                @relation("RegisteredBy", fields: [registeredById], references: [id])
+  // Nulo quando o lançamento foi criado pelo próprio colaborador via
+  // portal (self check-in) — não há usuário RH/gestora responsável.
+  registeredById     String?             @db.Uuid
+  registeredBy       User?               @relation("RegisteredBy", fields: [registeredById], references: [id])
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -123,6 +135,7 @@ model BillingPeriod {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   mealRecords MealRecord[]
+  dayCloses   DayClose[]
 
   @@index([status])
   @@index([startDate, endDate])
@@ -131,6 +144,18 @@ model BillingPeriod {
 enum BillingStatus {
   OPEN
   CLOSED
+}
+
+model DayClose {
+  id         String        @id @default(uuid()) @db.Uuid
+  date       DateTime      @db.Date @unique
+  periodId   String        @db.Uuid
+  period     BillingPeriod @relation(fields: [periodId], references: [id])
+  closedAt   DateTime      @default(now())
+  closedById String?       @db.Uuid
+  closedBy   User?         @relation("DayClosedBy", fields: [closedById], references: [id])
+
+  @@index([periodId])
 }
 
 model AuditLog {
@@ -145,4 +170,16 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+model PushSubscription {
+  id         String   @id @default(uuid()) @db.Uuid
+  employeeId String   @db.Uuid
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  createdAt  DateTime @default(now())
+
+  @@index([employeeId])
 }

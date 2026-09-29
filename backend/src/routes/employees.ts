@@ -24,6 +24,7 @@ const employeeSchema = z.object({
   status: z.nativeEnum(EmployeeStatus).optional(),
   scheduleType: z.nativeEnum(ScheduleType),
   workdays: workdaysSchema,
+  jobTitle: z.string().trim().max(60).optional().nullable(),
   admissionDate: z.string().optional().nullable(),
   terminationDate: z.string().optional().nullable()
 });
@@ -49,7 +50,10 @@ const serializeEmployee = (employee: {
   status: EmployeeStatus;
   scheduleType: ScheduleType;
   workdays: string | null;
+  jobTitle: string | null;
   accessCodeHash: string | null;
+  firstPortalAccessAt: Date | null;
+  lastPortalAccessAt: Date | null;
   admissionDate: Date | null;
   terminationDate: Date | null;
   createdAt: Date;
@@ -60,8 +64,11 @@ const serializeEmployee = (employee: {
   status: employee.status,
   scheduleType: employee.scheduleType,
   workdays: serializeWorkdays(employee.workdays),
-  // Nunca expor accessCodeHash: só o sinalizador.
+  jobTitle: employee.jobTitle,
+  // Nunca expor accessCodeHash: só sinalizadores.
   hasAccessCode: employee.accessCodeHash !== null,
+  portalAccess: (!employee.accessCodeHash ? "none" : !employee.firstPortalAccessAt ? "pending" : "active") as "none" | "pending" | "active",
+  lastPortalAccessAt: employee.lastPortalAccessAt?.toISOString() ?? null,
   admissionDate: employee.admissionDate?.toISOString().slice(0, 10) ?? null,
   terminationDate: employee.terminationDate?.toISOString().slice(0, 10) ?? null
 });
@@ -81,7 +88,7 @@ employeesRouter.get("/", asyncHandler(async (req, res) => {
   res.json({ employees: employees.map(serializeEmployee) });
 }));
 
-employeesRouter.post("/", requireRole(Role.RH), asyncHandler(async (req, res) => {
+employeesRouter.post("/", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const input = employeeSchema.parse(req.body);
   const employee = await prisma.employee.create({
@@ -90,6 +97,7 @@ employeesRouter.post("/", requireRole(Role.RH), asyncHandler(async (req, res) =>
       status: input.status ?? EmployeeStatus.ACTIVE,
       scheduleType: input.scheduleType,
       workdays: deserializeWorkdays(input.workdays),
+      jobTitle: input.jobTitle ?? null,
       admissionDate: input.admissionDate ? parseDate(input.admissionDate) : null,
       terminationDate: input.terminationDate ? parseDate(input.terminationDate) : null
     }
@@ -102,7 +110,7 @@ employeesRouter.post("/", requireRole(Role.RH), asyncHandler(async (req, res) =>
   res.status(201).json({ employee: serializeEmployee(employee) });
 }));
 
-employeesRouter.put("/:id", requireRole(Role.RH), asyncHandler(async (req, res) => {
+employeesRouter.put("/:id", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const input = employeeSchema.parse(req.body);
   const employee = await prisma.employee.update({
@@ -112,6 +120,7 @@ employeesRouter.put("/:id", requireRole(Role.RH), asyncHandler(async (req, res) 
       status: input.status ?? EmployeeStatus.ACTIVE,
       scheduleType: input.scheduleType,
       workdays: deserializeWorkdays(input.workdays),
+      jobTitle: input.jobTitle ?? null,
       admissionDate: input.admissionDate ? parseDate(input.admissionDate) : null,
       terminationDate: input.terminationDate ? parseDate(input.terminationDate) : null
     }
@@ -124,7 +133,7 @@ employeesRouter.put("/:id", requireRole(Role.RH), asyncHandler(async (req, res) 
   res.json({ employee: serializeEmployee(employee) });
 }));
 
-employeesRouter.delete("/:id", requireRole(Role.RH), asyncHandler(async (req, res) => {
+employeesRouter.delete("/:id", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const employee = await prisma.employee.update({
     where: { id: req.params.id },
@@ -150,7 +159,7 @@ function generateAccessCode() {
 // Define/reemite o código de acesso do colaborador (RH).
 // O código em texto puro é retornado UMA única vez — o RH entrega ao
 // colaborador e o sistema nunca o exibe de novo (só guarda o hash).
-employeesRouter.put("/:id/access-code", requireRole(Role.RH), asyncHandler(async (req, res) => {
+employeesRouter.put("/:id/access-code", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const input = accessCodeSchema.parse(req.body);
   const employee = await prisma.employee.findUnique({ where: { id: req.params.id } });
@@ -176,7 +185,7 @@ employeesRouter.put("/:id/access-code", requireRole(Role.RH), asyncHandler(async
 }));
 
 // Revoga o acesso do colaborador ao portal (RH).
-employeesRouter.delete("/:id/access-code", requireRole(Role.RH), asyncHandler(async (req, res) => {
+employeesRouter.delete("/:id/access-code", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const employee = await prisma.employee.findUnique({ where: { id: req.params.id } });
   if (!employee) return res.status(404).json({ message: "Funcionário não encontrado." });
@@ -196,7 +205,7 @@ employeesRouter.delete("/:id/access-code", requireRole(Role.RH), asyncHandler(as
 // Gera códigos para todos os ativos sem acesso (RH). A lista com os códigos
 // é retornada UMA única vez para impressão/entrega dentro da empresa;
 // depois, só reemissão individual. Perdeu o código = reemitir.
-employeesRouter.post("/access-codes/batch", requireRole(Role.RH), asyncHandler(async (req, res) => {
+employeesRouter.post("/access-codes/batch", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const pending = await prisma.employee.findMany({
     where: { status: EmployeeStatus.ACTIVE, accessCodeHash: null },

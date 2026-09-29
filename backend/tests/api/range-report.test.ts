@@ -1,0 +1,146 @@
+// API: relatório por intervalo (cruza períodos) — JSON/XLSX/PDF do mesmo cálculo.
+import request from "supertest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { app } from "../../src/server.js";
+import { cleanup, createEmployee, createPeriod, createPrice, createUser, d, pdfTextOf } from "../helpers.js";
+import { prisma } from "../../src/lib/prisma.js";
+
+const TAG = "rreport";
+let rhToken = "";
+let employeeId = "";
+const ids = { userIds: [] as string[], periodIds: [] as string[], priceIds: [] as string[], employeeIds: [] as string[] };
+
+beforeAll(async () => {
+  const rh = await createUser(`${TAG}-rh`, "RH");
+  ids.userIds.push(rh.id);
+  rhToken = (await request(app).post("/api/auth/login").send({ email: rh.email, password: "senha-teste" })).body.token;
+  const emp = await createEmployee(TAG);
+  employeeId = emp.id;
+  ids.employeeIds.push(emp.id);
+  const periodA = await createPeriod(`${TAG}-a`, "2021-08-01", "2021-08-31");
+  const periodB = await createPeriod(`${TAG}-b`, "2021-09-01", "2021-09-30");
+  ids.periodIds.push(periodA.id, periodB.id);
+  // validFrom dentro do próprio intervalo: vence qualquer global residual de
+  // outro arquivo (o banco de teste é compartilhado entre arquivos).
+  const price = await createPrice(10, "2021-08-01");
+  ids.priceIds.push(price.id);
+  await prisma.mealRecord.create({
+    data: { employeeId, periodId: periodA.id, date: d("2021-08-31"), quantity: 1, confirmationStatus: "PEGUEI", registeredById: rh.id }
+  });
+  await prisma.mealRecord.create({
+    data: { employeeId, periodId: periodB.id, date: d("2021-09-01"), quantity: 1, confirmationStatus: "PEGUEI", registeredById: rh.id }
+  });
+  await prisma.mealRecord.create({
+    data: { employeeId, periodId: periodB.id, date: d("2021-09-02"), quantity: 1, confirmationStatus: "NAO_PEGUEI", registeredById: rh.id }
+  });
+});
+
+afterAll(() => cleanup(ids));
+
+const rangeUrl = (query: string) => `/api/reports${query}`;
+
+const asBuffer = (r: { on: (e: string, cb: (c: unknown) => void) => void }, cb: (err: unknown, body: Buffer) => void) => {
+  const chunks: Buffer[] = [];
+  r.on("data", (c) => chunks.push(c as Buffer));
+  r.on("end", () => cb(null, Buffer.concat(chunks)));
+};
+
+describe("reports por intervalo", () => {
+  it("JSON cruza períodos somando só PEGUEI", async () => {
+    const res = await request(app).get(rangeUrl("?start=2021-08-30&end=2021-09-02"))
+      .set("Authorization", `Bearer ${rhToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.report.totalQuantity).toBe(2);
+    expect(res.body.report.totalAmount).toBe(20);
+    expect(res.body.report.period.id).toBe("range");
+    expect(res.body.report.period.label).toBe("30/08/2021 a 02/09/2021");
+    expect(res.body.report.period.startDate).toBe("2021-08-30");
+    expect(res.body.report.period.endDate).toBe("2021-09-02");
+    expect(res.body.report.period.status).toBe("OPEN");
+  });
+
+  it("JSON traz dailyMatrix contínua com distinção PEGUEI-only (PLAN-012 Task 1)", async () => {
+    const res = await request(app).get(rangeUrl("?start=2021-08-30&end=2021-09-02"))
+      .set("Authorization", `Bearer ${rhToken}`);
+    expect(res.status).toBe(200);
+    const matrix = res.body.report.dailyMatrix;
+    // Intervalo 2021-08-30 (seg) → 2021-09-02 (qui): calendário contínuo.
+    expect(matrix).toHaveLength(4);
+    expect(matrix.map((day: { date: string }) => day.date)).toEqual([
+      "2021-08-30", "2021-08-31", "2021-09-01", "2021-09-02"
+    ]);
+    expect(matrix.map((day: { weekdayLabel: string }) => day.weekdayLabel)).toEqual([
+      "Seg", "Ter", "Qua", "Qui"
+    ]);
+    expect(matrix.map((day: { dayOfWeek: number }) => day.dayOfWeek)).toEqual([1, 2, 3, 4]);
+    expect(matrix.every((day: { isWeekend: boolean }) => day.isWeekend === false)).toBe(true);
+    // Dia PEGUEI fatura; dia NAO_PEGUEI soma só no bruto (quantidade lançada).
+    expect(matrix[1]).toMatchObject({ totalQuantity: 1, totalRawQuantity: 1, amount: 10 });
+    expect(matrix[1].entries[employeeId]).toEqual({ quantity: 1, confirmationStatus: "PEGUEI" });
+    expect(matrix[3]).toMatchObject({ totalQuantity: 0, totalRawQuantity: 1, amount: 0 });
+    expect(matrix[3].entries[employeeId]).toEqual({ quantity: 1, confirmationStatus: "NAO_PEGUEI" });
+    // Dia sem lançamento: neutro.
+    expect(matrix[0]).toMatchObject({ totalQuantity: 0, totalRawQuantity: 0, amount: 0, entries: {} });
+    // Totais existentes inalterados.
+    expect(res.body.report.totalQuantity).toBe(2);
+    expect(res.body.report.totalAmount).toBe(20);
+  });
+
+  it("XLSX tem content-type de planilha e filename do intervalo", async () => {
+    const res = await request(app).get(rangeUrl("?start=2021-08-30&end=2021-09-02&format=xlsx"))
+      .set("Authorization", `Bearer ${rhToken}`).buffer(true).parse(asBuffer);
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("spreadsheetml");
+    expect(res.headers["content-disposition"]).toContain("relatorio_20210830_a_20210902.xlsx");
+    expect((res.body as Buffer).length).toBeGreaterThan(1024);
+  });
+
+  it("PDF é válido (%PDF) e filename do intervalo", async () => {
+    const res = await request(app).get(rangeUrl("?start=2021-08-30&end=2021-09-02&format=pdf"))
+      .set("Authorization", `Bearer ${rhToken}`).buffer(true).parse(asBuffer);
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("application/pdf");
+    expect(res.headers["content-disposition"]).toContain("relatorio_20210830_a_20210902.pdf");
+    expect((res.body as Buffer).subarray(0, 4).toString()).toBe("%PDF");
+  });
+
+  it("PDF profissional PLAN-013 Task 5: faixa Genesis, intervalo, nome e Total geral", async () => {
+    const res = await request(app).get(rangeUrl("?start=2021-08-30&end=2021-09-02&format=pdf"))
+      .set("Authorization", `Bearer ${rhToken}`).buffer(true).parse(asBuffer);
+    expect(res.status).toBe(200);
+    const buf = res.body as Buffer;
+    expect(buf.subarray(0, 4).toString()).toBe("%PDF");
+    expect(buf.length).toBeGreaterThan(2500);
+    const text = pdfTextOf(buf);
+    expect(text).toContain("GTF");
+    expect(text).toContain("Fechamento de Folha");
+    expect(text).toContain("30/08/2021 a 02/09/2021");
+    expect(text).toContain("Func rreport");
+    expect(text).toContain("Total geral");
+    expect(text).toContain("R$ 20,00");
+  });
+
+  it("HTML traz prévia do intervalo", async () => {
+    const res = await request(app).get(rangeUrl("?start=2021-08-30&end=2021-09-02&format=html"))
+      .set("Authorization", `Bearer ${rhToken}`);
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/html");
+    expect(res.text).toContain("30/08/2021 a 02/09/2021");
+    expect(res.text).toContain("Total geral");
+  });
+
+  it("start > end dá 422", async () => {
+    const res = await request(app).get(rangeUrl("?start=2021-09-02&end=2021-08-30"))
+      .set("Authorization", `Bearer ${rhToken}`);
+    expect(res.status).toBe(422);
+  });
+
+  it("intervalo acima de 366 dias dá 422 (366 exatos passa)", async () => {
+    const over = await request(app).get(rangeUrl("?start=2020-01-01&end=2021-01-02"))
+      .set("Authorization", `Bearer ${rhToken}`);
+    expect(over.status).toBe(422);
+    const edge = await request(app).get(rangeUrl("?start=2020-01-01&end=2021-01-01"))
+      .set("Authorization", `Bearer ${rhToken}`);
+    expect(edge.status).toBe(200);
+  });
+});

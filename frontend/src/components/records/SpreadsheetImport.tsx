@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { CheckCircle2, FileSpreadsheet, Upload, XCircle } from "lucide-react";
-import styled from "styled-components";
+import { toast } from "sonner";
 import { api } from "../../api";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { ImportPreviewRow } from "../../types";
 import { parseSpreadsheetFile, type SheetRow } from "../../utils/spreadsheet";
-import { Badge, Button, DataTable, EmptyState, Panel, PanelHeader } from "../ui";
+import { DataTable, EmptyState, Panel, PanelHeader } from "../ui";
 
 export function SpreadsheetImport({
   token,
@@ -64,6 +66,7 @@ export function SpreadsheetImport({
     try {
       const result = await api.importMealRecords(token, periodId, rows, false);
       setMessage(`${result.records.length} lançamento(s) importados.`);
+      toast.success(`${result.records.length} lançamento(s) importados.`);
       setRows([]);
       setPreview([]);
       setValid(false);
@@ -85,7 +88,7 @@ export function SpreadsheetImport({
         </div>
       </PanelHeader>
 
-      <ImportGrid>
+      <div className="grid gap-2 [&>label]:text-[0.86rem] [&>label]:font-extrabold [&>input[type=file]]:min-h-11 [&>span]:text-[0.86rem] [&>span]:font-bold [&>span]:text-muted">
         <label htmlFor="spreadsheet-file">Arquivo</label>
         <input
           id="spreadsheet-file"
@@ -95,18 +98,18 @@ export function SpreadsheetImport({
           onChange={(event) => void handleFile(event.target.files?.[0])}
         />
         {fileName && <span>{fileName} · {rows.length} linha(s) lidas</span>}
-      </ImportGrid>
+      </div>
 
       {parseErrors.length > 0 && (
-        <ErrorList>
+        <ul className="grid list-disc gap-[6px] rounded-lg border border-danger/30 bg-danger/5 py-3 pl-8 pr-3 text-[0.88rem] font-bold text-danger-ink">
           {parseErrors.map((item) => (
             <li key={item}>{item}</li>
           ))}
-        </ErrorList>
+        </ul>
       )}
 
       {rows.length > 0 && (
-        <ImportActions>
+        <div className="flex flex-wrap gap-2">
           <Button type="button" onClick={() => void confer()} disabled={busy || readOnly}>
             <FileSpreadsheet size={17} />
             {busy ? "Conferindo..." : "Conferir antes de gravar"}
@@ -115,11 +118,11 @@ export function SpreadsheetImport({
             <Upload size={17} />
             Confirmar importação
           </Button>
-        </ImportActions>
+        </div>
       )}
 
       {error && <EmptyState>{error}</EmptyState>}
-      {message && <SuccessLine><CheckCircle2 size={18} /> {message}</SuccessLine>}
+      {message && <p className="flex items-center gap-2 font-extrabold text-teal-deep"><CheckCircle2 size={18} /> {message}</p>}
 
       {preview.length > 0 && (
         <DataTable>
@@ -143,9 +146,9 @@ export function SpreadsheetImport({
                 <td>{row.quantity}</td>
                 <td>
                   {row.status === "ok" ? (
-                    <Badge $tone="good">OK</Badge>
+                    <Badge variant="good">OK</Badge>
                   ) : (
-                    <Badge $tone="warn" title={row.message}>
+                    <Badge variant="warn" title={row.message}>
                       <XCircle size={14} /> Erro
                     </Badge>
                   )}
@@ -156,59 +159,12 @@ export function SpreadsheetImport({
         </DataTable>
       )}
       {preview.some((row) => row.status === "error") && (
-        <ErrorList>
+        <ul className="grid list-disc gap-[6px] rounded-lg border border-danger/30 bg-danger/5 py-3 pl-8 pr-3 text-[0.88rem] font-bold text-danger-ink">
           {preview.filter((row) => row.status === "error").map((row) => (
             <li key={row.index}>Linha {row.index}: {row.message}</li>
           ))}
-        </ErrorList>
+        </ul>
       )}
     </Panel>
   );
 }
-
-const ImportGrid = styled.div`
-  display: grid;
-  gap: 8px;
-
-  label {
-    font-weight: 800;
-    font-size: 0.86rem;
-  }
-
-  input[type="file"] {
-    min-height: 44px;
-  }
-
-  span {
-    color: var(--muted);
-    font-size: 0.86rem;
-    font-weight: 700;
-  }
-`;
-
-const ImportActions = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-`;
-
-const ErrorList = styled.ul`
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 12px 12px 12px 32px;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  background: #fff1f2;
-  color: #b91c1c;
-  font-size: 0.88rem;
-  font-weight: 700;
-`;
-
-const SuccessLine = styled.p`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--teal);
-  font-weight: 800;
-`;

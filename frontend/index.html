@@ -5,6 +5,13 @@
     <link rel="icon" type="image/png" href="/src/images/logogtf.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sistema RH - Grupo GTF</title>
+    <script>
+      try {
+        var t = localStorage.getItem("sistema-rh-theme");
+        if (t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches))
+          document.documentElement.classList.add("dark");
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

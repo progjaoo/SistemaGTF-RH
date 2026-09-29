@@ -49,6 +49,7 @@ export default function UsersPage({
             <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as Role })}>
               <option value="RH">RH</option>
               <option value="GESTORA">Gestora</option>
+              <option value="ADMIN">Admin</option>
             </select>
           </Field>
           <CheckboxLabel>
@@ -81,8 +82,8 @@ export default function UsersPage({
               <tr key={user.id}>
                 <td>{user.name}</td>
                 <td>{user.email}</td>
-                <td>{user.role === "RH" ? "RH" : "Gestora"}</td>
-                <td><Badge $tone={user.active ? "good" : "muted"}>{user.active ? "Ativo" : "Inativo"}</Badge></td>
+                <td>{user.role === "RH" ? "RH" : user.role === "ADMIN" ? "Admin" : "Gestora"}</td>
+                <td><Badge variant={user.active ? "good" : "muted"}>{user.active ? "Ativo" : "Inativo"}</Badge></td>
                 <td><Button type="button" onClick={() => startEdit(user)}>Editar</Button></td>
               </tr>
             ))}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import styled from "styled-components";
+import { toast } from "sonner";
 import { api } from "../../api";
 import { BrandLogo } from "../../components/layout";
 import { AccessCodeStep } from "../../components/employee-portal/AccessCodeStep";
@@ -16,10 +16,14 @@ type Step = "search" | "code" | "calendar";
 
 function loadSession(): { token: string; employee: EmployeePortalSearchResult } | null {
   try {
-    const token = sessionStorage.getItem(TOKEN_KEY);
-    const raw = sessionStorage.getItem(EMPLOYEE_KEY);
-    if (!token || !raw) return null;
-    return { token, employee: JSON.parse(raw) as EmployeePortalSearchResult };
+    // "Manter conectado" (30 dias) vive no localStorage; sessão de turno (8h), no sessionStorage.
+    const stores = [localStorage, sessionStorage];
+    for (const store of stores) {
+      const token = store.getItem(TOKEN_KEY);
+      const raw = store.getItem(EMPLOYEE_KEY);
+      if (token && raw) return { token, employee: JSON.parse(raw) as EmployeePortalSearchResult };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -40,11 +44,30 @@ export default function EmployeePortalPage() {
   const [searchError, setSearchError] = useState("");
   const [codeError, setCodeError] = useState("");
   const [calendarError, setCalendarError] = useState("");
+  const [installEvent, setInstallEvent] = useState<Event | null>(null);
   const currentMonth = useMemo(() => monthKeyInSaoPaulo(), []);
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      event.preventDefault();
+      setInstallEvent(event);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  async function installApp() {
+    const evt = installEvent as unknown as { prompt: () => Promise<void> } | null;
+    if (!evt) return;
+    await evt.prompt();
+    setInstallEvent(null);
+  }
+
   function clearSession() {
-    sessionStorage.removeItem(TOKEN_KEY);
-    sessionStorage.removeItem(EMPLOYEE_KEY);
+    for (const store of [localStorage, sessionStorage]) {
+      store.removeItem(TOKEN_KEY);
+      store.removeItem(EMPLOYEE_KEY);
+    }
     setPortalToken("");
     setSelectedEmployee(null);
     setDays([]);
@@ -79,14 +102,15 @@ export default function EmployeePortalPage() {
     setStep("code");
   }
 
-  async function submitCode(code: string) {
+  async function submitCode(code: string, remember: boolean) {
     if (!selectedEmployee) return;
     setLoadingCode(true);
     setCodeError("");
     try {
-      const response = await api.employeePortalLogin(selectedEmployee.id, code);
-      sessionStorage.setItem(TOKEN_KEY, response.token);
-      sessionStorage.setItem(EMPLOYEE_KEY, JSON.stringify(response.employee));
+      const response = await api.employeePortalLogin(selectedEmployee.id, code, remember);
+      const storage = remember ? localStorage : sessionStorage;
+      storage.setItem(TOKEN_KEY, response.token);
+      storage.setItem(EMPLOYEE_KEY, JSON.stringify(response.employee));
       setPortalToken(response.token);
       setSelectedEmployee(response.employee);
       setStep("calendar");
@@ -148,7 +172,12 @@ export default function EmployeePortalPage() {
 
     try {
       const response = await api.employeePortalCheckin(selectedEmployee.id, date, status, portalToken, note);
-      setDays((currentDays) => currentDays.map((day) => (day.id === response.record.id ? response.record : day)));
+      setDays((currentDays) =>
+        currentDays.some((day) => day.id === response.record.id)
+          ? currentDays.map((day) => (day.id === response.record.id ? response.record : day))
+          : [...currentDays, response.record].sort((a, b) => a.date.localeCompare(b.date))
+      );
+      if (status === "NAO_PEGUEI") toast.info("Registrado: você não pegou o almoço.");
     } catch (error) {
       if (error instanceof Error && /expirada|autenticado|inválida/i.test(error.message)) {
         setDays(previousDays);
@@ -156,21 +185,32 @@ export default function EmployeePortalPage() {
         return;
       }
       setDays(previousDays);
-      setCalendarError(error instanceof Error ? error.message : "Não foi possível salvar a confirmação.");
+      const message = error instanceof Error ? error.message : "Não foi possível salvar a confirmação.";
+      setCalendarError(message);
+      toast.error(message);
     } finally {
       setSavingDate("");
     }
   }
 
   return (
-    <PortalLayout>
-      <PortalHeader>
-        <BrandLogo src={logoGtf} alt="Grupo GTF" />
-        <div>
-          <strong>GTF - Recursos Humanos</strong>
-          <span>Controle de Almoços</span>
+    <main className="grid min-h-[100dvh] content-start justify-items-center gap-5 bg-paper bg-[linear-gradient(90deg,rgb(43_168_162/0.08)_0_1px,transparent_1px_100%)] bg-[length:42px_42px] p-[clamp(18px,5vw,42px)] dark:bg-[linear-gradient(90deg,rgb(43_168_162/0.05)_0_1px,transparent_1px_100%)]">
+      <header className="flex w-[min(760px,100%)] flex-wrap items-center gap-[14px] text-ink">
+        <BrandLogo src={logoGtf} alt="Grupo GTF" className="h-[54px] w-[92px]" />
+        <div className="min-w-0 flex-1">
+          <strong className="block text-[1.05rem]">GTF - Recursos Humanos</strong>
+          <span className="block font-bold text-muted">Controle de Almoços</span>
         </div>
-      </PortalHeader>
+        {installEvent && (
+          <button
+            type="button"
+            onClick={() => void installApp()}
+            className="min-h-10 rounded-lg bg-teal-ink px-3 py-2 text-[0.85rem] font-extrabold text-white"
+          >
+            Instalar app
+          </button>
+        )}
+      </header>
 
       {step === "search" && (
         <NameSearch
@@ -200,6 +240,7 @@ export default function EmployeePortalPage() {
       {step === "calendar" && selectedEmployee && (
         <EmployeeCalendar
           employee={selectedEmployee}
+          portalToken={portalToken}
           month={month}
           currentMonth={currentMonth}
           days={days}
@@ -215,45 +256,6 @@ export default function EmployeePortalPage() {
           }}
         />
       )}
-    </PortalLayout>
+    </main>
   );
 }
-
-const PortalLayout = styled.main`
-  display: grid;
-  align-content: start;
-  justify-items: center;
-  gap: 20px;
-  min-height: 100vh;
-  padding: clamp(18px, 5vw, 42px);
-  background:
-    linear-gradient(90deg, rgba(15, 118, 110, 0.08) 0 1px, transparent 1px 100%) 0 0 / 42px 42px,
-    var(--paper);
-`;
-
-const PortalHeader = styled.header`
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: min(760px, 100%);
-  color: var(--ink);
-
-  ${BrandLogo} {
-    width: 92px;
-    height: 54px;
-  }
-
-  strong,
-  span {
-    display: block;
-  }
-
-  strong {
-    font-size: 1.05rem;
-  }
-
-  span {
-    color: var(--muted);
-    font-weight: 750;
-  }
-`;

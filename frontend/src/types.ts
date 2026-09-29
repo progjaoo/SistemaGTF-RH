@@ -1,4 +1,4 @@
-export type Role = "RH" | "GESTORA";
+export type Role = "RH" | "GESTORA" | "ADMIN";
 export type EmployeeStatus = "ACTIVE" | "INACTIVE";
 export type ScheduleType = "MON_FRI" | "MON_SUN" | "CUSTOM";
 export type BillingStatus = "OPEN" | "CLOSED";
@@ -20,8 +20,14 @@ export type Employee = {
   scheduleType: ScheduleType;
   // Dias esperados (0=dom..6=sáb). Null = segue o scheduleType.
   workdays: number[] | null;
+  // Função/cargo do colaborador. Null = não informado.
+  jobTitle: string | null;
   // True = colaborador tem código de acesso ao portal (hash nunca trafega).
   hasAccessCode: boolean;
+  // none = sem código; pending = código gerado, nunca usado; active = já entrou.
+  portalAccess: "none" | "pending" | "active";
+  // ISO do último login no portal. Null = nunca entrou.
+  lastPortalAccessAt: string | null;
   admissionDate: string | null;
   terminationDate: string | null;
 };
@@ -31,6 +37,7 @@ export type MealPrice = {
   value: number;
   validFrom: string;
   validTo: string | null;
+  status: "VIGENTE" | "FUTURA" | "ENCERRADA";
   employeeId: string | null;
   employee: Pick<Employee, "id" | "name"> | null;
 };
@@ -62,6 +69,27 @@ export type EmployeeTotal = {
   quantity: number;
   amount: number;
   unitPrices: number[];
+  taken: number;
+  notTaken: number;
+  pending: number;
+  takenDates: string[];
+  notTakenDates: string[];
+};
+
+export type DailyMatrixCell = {
+  quantity: number;
+  confirmationStatus: "PENDING" | "PEGUEI" | "NAO_PEGUEI" | "NONE";
+};
+
+export type DailyMatrixDay = {
+  date: string;            // "YYYY-MM-DD"
+  dayOfWeek: number;       // 0=domingo, 6=sábado
+  weekdayLabel: string;    // "Seg", "Ter", "Sáb", "Dom"
+  isWeekend: boolean;
+  totalQuantity: number;   // faturável (PEGUEI)
+  totalRawQuantity: number;// soma bruta lançada
+  amount: number;          // R$ faturado no dia
+  entries: Record<string, DailyMatrixCell>; // employeeId -> { quantity, confirmationStatus }
 };
 
 export type DailyTotal = {
@@ -76,7 +104,13 @@ export type PeriodSummary = {
   totalAmount: number;
   employeeTotals: EmployeeTotal[];
   dailyTrend: DailyTotal[];
+  dailyMatrix: DailyMatrixDay[];
 };
+
+// Relatório por intervalo arbitrário: mesmo corpo do PeriodSummary; só o
+// objeto `period` é sintético (id "range"). Alias mantido para documentar
+// a intenção e permitir divergência futura sem quebrar consumidores.
+export type RangeSummary = PeriodSummary;
 
 export type DashboardSummary = {
   current: PeriodSummary;

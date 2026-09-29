@@ -50,7 +50,8 @@ const checkinSchema = z.object({
 
 const portalLoginSchema = z.object({
   employeeId: z.string(),
-  code: z.string().regex(/^\d{6}$/, "Código com 6 dígitos.")
+  code: z.string().regex(/^\d{6}$/, "Código com 6 dígitos."),
+  remember: z.boolean().optional().default(false)
 });
 
 function monthBounds(month: string) {
@@ -128,18 +129,29 @@ employeePortalRouter.post("/login", portalLoginLimiter, asyncHandler(async (req,
     return res.status(401).json({ message: "Código inválido." });
   }
 
-  const token = jwt.sign({ sub: employee.id, scope: "employee-portal" }, config.jwtSecret, { expiresIn: "8h" });
+  const token = jwt.sign({ sub: employee.id, scope: "employee-portal" }, config.jwtSecret, {
+    expiresIn: input.remember ? "30d" : "8h"
+  });
+
+  // Ativação: primeiro login com código marca o acesso como ativo.
+  // O último acesso é atualizado a cada login ok (isFirstAccess segue
+  // para a auditoria PORTAL_ACTIVATED vs PORTAL_LOGIN).
+  const isFirstAccess = !employee.firstPortalAccessAt;
+  await prisma.employee.update({
+    where: { id: employee.id },
+    data: { firstPortalAccessAt: employee.firstPortalAccessAt ?? new Date(), lastPortalAccessAt: new Date() }
+  });
 
   await prisma.auditLog.create({
     data: {
       entity: "Employee",
       entityId: employee.id,
-      action: "PORTAL_LOGIN",
-      metadata: { ip: req.ip ?? null, userAgent: req.get("user-agent") ?? null }
+      action: isFirstAccess ? "PORTAL_ACTIVATED" : "PORTAL_LOGIN",
+      metadata: { ip: req.ip ?? null, userAgent: req.get("user-agent") ?? null, remember: input.remember }
     }
   });
 
-  res.json({ token, employee: { id: employee.id, name: employee.name } });
+  res.json({ token, employee: { id: employee.id, name: employee.name }, portalStatus: "active" });
 }));
 
 employeePortalRouter.get("/:employeeId/calendar", authenticatePortal, asyncHandler(async (req, res) => {
@@ -206,6 +218,37 @@ employeePortalRouter.get("/:employeeId/calendar", authenticatePortal, asyncHandl
   });
 }));
 
+const pushSubscriptionSchema = z.object({
+  endpoint: z.string().url(),
+  keys: z.object({ p256dh: z.string().min(1), auth: z.string().min(1) })
+});
+
+employeePortalRouter.get("/:employeeId/push/vapid-key", authenticatePortal, asyncHandler(async (req, res) => {
+  const portalEmployee = (req as PortalRequest).portalEmployee;
+  if (portalEmployee.id !== req.params.employeeId) return res.status(403).json({ message: "Sessão de outro colaborador." });
+  res.json({ publicKey: config.vapidPublicKey });
+}));
+
+employeePortalRouter.post("/:employeeId/push/subscriptions", authenticatePortal, asyncHandler(async (req, res) => {
+  const portalEmployee = (req as PortalRequest).portalEmployee;
+  if (portalEmployee.id !== req.params.employeeId) return res.status(403).json({ message: "Sessão de outro colaborador." });
+  const input = pushSubscriptionSchema.parse(req.body);
+  const sub = await prisma.pushSubscription.upsert({
+    where: { endpoint: input.endpoint },
+    update: { employeeId: portalEmployee.id, p256dh: input.keys.p256dh, auth: input.keys.auth },
+    create: { employeeId: portalEmployee.id, endpoint: input.endpoint, p256dh: input.keys.p256dh, auth: input.keys.auth }
+  });
+  res.status(201).json({ subscription: { id: sub.id, endpoint: sub.endpoint } });
+}));
+
+employeePortalRouter.delete("/:employeeId/push/subscriptions", authenticatePortal, asyncHandler(async (req, res) => {
+  const portalEmployee = (req as PortalRequest).portalEmployee;
+  if (portalEmployee.id !== req.params.employeeId) return res.status(403).json({ message: "Sessão de outro colaborador." });
+  const { endpoint } = z.object({ endpoint: z.string().url() }).parse(req.body);
+  await prisma.pushSubscription.deleteMany({ where: { endpoint, employeeId: portalEmployee.id } });
+  res.json({ ok: true });
+}));
+
 employeePortalRouter.post("/:employeeId/checkin", authenticatePortal, asyncHandler(async (req, res) => {
   const portalEmployee = (req as PortalRequest).portalEmployee;
   if (portalEmployee.id !== req.params.employeeId) {
@@ -214,6 +257,9 @@ employeePortalRouter.post("/:employeeId/checkin", authenticatePortal, asyncHandl
 
   const input = checkinSchema.parse(req.body);
   const date = parseDate(input.date);
+
+  const dayClosed = await prisma.dayClose.findUnique({ where: { date } });
+  if (dayClosed) return res.status(422).json({ message: "Dia fechado para lançamentos. Reabra o dia para editar." });
 
   if (isFutureDate(date)) {
     return res.status(422).json({ message: "Não é possível confirmar almoço em data futura." });
@@ -231,8 +277,96 @@ employeePortalRouter.post("/:employeeId/checkin", authenticatePortal, asyncHandl
     include: { period: true }
   });
 
+  const isLate = formatDate(date) < formatDateKeyInSaoPaulo();
+  const note = input.note?.trim() ? input.note.trim() : null;
+  if (isLate && !note) {
+    return res.status(422).json({ message: "Justificativa obrigatória para marcação atrasada." });
+  }
+
+  // Self check-in: sem lançamento do RH, o colaborador cria o próprio
+  // registro (quantidade 1) dentro de um período OPEN que cubra a data.
+  // É assim que o dia fica "aberto para lançamento" e a gestora confere
+  // em tempo real — antes o portal exigia lançamento prévio e devolvia 404.
   if (!record || record.quantity <= 0) {
-    return res.status(404).json({ message: "Não existe lançamento de almoço para esta data." });
+    const openPeriod = await prisma.billingPeriod.findFirst({
+      where: {
+        status: BillingStatus.OPEN,
+        startDate: { lte: date },
+        endDate: { gte: date }
+      }
+    });
+
+    if (!openPeriod) {
+      return res.status(422).json({ message: "Nenhum período aberto para esta data. Fale com o RH." });
+    }
+
+    const created = await prisma.mealRecord.create({
+      data: {
+        employeeId: employee.id,
+        periodId: openPeriod.id,
+        date,
+        quantity: 1,
+        confirmationStatus: input.status,
+        confirmationSource: "SISTEMA",
+        confirmationNote: note,
+        confirmedAt: new Date(),
+        registeredById: null
+      },
+      include: { period: true }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        entity: "MealRecord",
+        entityId: created.id,
+        action: "EMPLOYEE_PORTAL_CHECKIN",
+        metadata: {
+          employeeId: employee.id,
+          employeeName: employee.name,
+          date: input.date,
+          status: input.status,
+          source: "SISTEMA",
+          selfCreated: true,
+          isLate,
+          note,
+          ip: req.ip,
+          userAgent: req.get("user-agent") ?? null
+        } satisfies Prisma.JsonObject
+      }
+    });
+
+    const selfPayload = {
+      id: created.id,
+      employeeId: employee.id,
+      date: formatDate(created.date),
+      quantity: created.quantity,
+      confirmationStatus: created.confirmationStatus,
+      confirmationSource: created.confirmationSource,
+      confirmationNote: created.confirmationNote,
+      isLate,
+      confirmedAt: created.confirmedAt?.toISOString() ?? null,
+      period: {
+        id: created.period.id,
+        label: created.period.label,
+        status: created.period.status
+      }
+    };
+
+    emitMealConfirmationUpdated({
+      periodId: created.periodId,
+      confirmation: {
+        employeeId: employee.id,
+        employeeName: employee.name,
+        date: selfPayload.date,
+        quantity: created.quantity,
+        confirmationStatus: created.confirmationStatus,
+        confirmationSource: created.confirmationSource,
+        confirmationNote: created.confirmationNote,
+        confirmedAt: selfPayload.confirmedAt
+      }
+    });
+
+    return res.json({ record: selfPayload });
   }
 
   if (record.period.status === BillingStatus.CLOSED) {
@@ -243,12 +377,6 @@ employeePortalRouter.post("/:employeeId/checkin", authenticatePortal, asyncHandl
   // com RH/gestora (decisão travada PLAN-001 §9).
   if (record.confirmationStatus !== "PENDING") {
     return res.status(409).json({ message: "Confirmação já registrada. Para alterar, fale pessoalmente com o RH." });
-  }
-
-  const isLate = formatDate(date) < formatDateKeyInSaoPaulo();
-  const note = input.note?.trim() ? input.note.trim() : null;
-  if (isLate && !note) {
-    return res.status(422).json({ message: "Justificativa obrigatória para marcação atrasada." });
   }
 
   await prisma.$executeRaw`

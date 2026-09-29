@@ -1,0 +1,180 @@
+@import "tailwindcss";
+@import "@fontsource/dm-sans/400.css";
+@import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-sans/700.css";
+
+@font-face {
+  font-family: "General Sans";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url("./assets/fonts/general-sans-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "General Sans";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url("./assets/fonts/general-sans-700.woff2") format("woff2");
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-teal: #2BA8A2;
+  --color-teal-hover: #3CC4BD;
+  --color-teal-deep: #1E8C86;
+  --color-teal-ink: #145e59;
+  --color-teal-bg: #E8F6F5;
+  --color-gold: #FFD23F;
+  --color-gold-soft: #FFE47A;
+  --color-gold-deep: #E6B800;
+  --color-coral: #EF6C4A;
+  --color-coral-deep: #D45233;
+  --color-cream: #FFF8E7;
+  --color-sky: #5DADE2;
+  --color-paper: #EFF8F7;
+  --color-surface: #FFFFFF;
+  --color-steel: #34495e;
+  --color-success: #27AE60;
+  --color-danger: #E74C3C;
+  --color-danger-ink: #B3261E;
+  --color-ink: #20262c;
+  --color-muted: #68717c;
+  --color-line: #d9e0e6;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "General Sans", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+.dark {
+  --color-paper: #0e1514;
+  --color-surface: #182220;
+  --color-ink: #e9f0ee;
+  --color-muted: #9aa7a4;
+  --color-line: #2b3835;
+  --color-teal-bg: #123836;
+  --color-cream: #23200f;
+  --color-gold-soft: #8a7300;
+}
+
+.dark body {
+  background-image: linear-gradient(90deg, rgb(43 168 162 / 0.05) 0 1px, transparent 1px 100%);
+}
+
+body {
+  @apply bg-paper text-ink font-sans antialiased;
+  font-size: 15px;
+  background-image: linear-gradient(90deg, rgb(43 168 162 / 0.08) 0 1px, transparent 1px 100%);
+  background-size: 42px 42px;
+}
+
+button { cursor: pointer; }
+button:active:not(:disabled) { transform: scale(0.98); }
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="dialog"]:focus-visible {
+  outline: 3px solid rgb(43 168 162 / 0.35);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* react-day-picker no portal do colaborador (tokens Genesis) */
+.portal-calendar .rdp-root {
+  --rdp-accent-color: var(--color-teal);
+  --rdp-accent-background-color: var(--color-teal-bg);
+  --rdp-day-height: 44px;
+  --rdp-day-width: 44px;
+  margin: 0 auto;
+}
+
+.portal-calendar .rdp-day_button {
+  position: relative;
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.portal-calendar .rdp-day_button .dot {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  transform: translateX(-50%);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.portal-calendar .day-late .rdp-day_button {
+  border: 1px solid #f59e0b;
+}
+
+.portal-calendar .day-closed .rdp-day_button {
+  color: var(--color-muted);
+}
+
+.portal-calendar .dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.portal-calendar .dot-pending { background: #f59e0b; }
+.portal-calendar .dot-late { background: #dc2626; }
+.portal-calendar .dot-confirmed { background: var(--color-teal); }
+.portal-calendar .dot-closed { background: #9ca3af; }
+
+/* 360px: 7 colunas x 44px (308px) estouram os ~282px úteis da seção;
+   reduz só a largura (altura segue 44px para o toque). */
+@media (max-width: 520px) {
+  .portal-calendar .rdp-root {
+    --rdp-day-width: 38px;
+  }
+  .portal-calendar .rdp-day_button {
+    min-width: 38px;
+  }
+}
+
+:root {
+  --sidebar: hsl(0 0% 98%);
+  --sidebar-foreground: hsl(240 5.3% 26.1%);
+  --sidebar-primary: hsl(240 5.9% 10%);
+  --sidebar-primary-foreground: hsl(0 0% 98%);
+  --sidebar-accent: hsl(240 4.8% 95.9%);
+  --sidebar-accent-foreground: hsl(240 5.9% 10%);
+  --sidebar-border: hsl(220 13% 91%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+.dark {
+  --sidebar: hsl(240 5.9% 10%);
+  --sidebar-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-primary: hsl(224.3 76.3% 48%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(240 3.7% 15.9%);
+  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-border: hsl(240 3.7% 15.9%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+@theme inline {
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}

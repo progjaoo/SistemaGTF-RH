@@ -48,6 +48,9 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sistema_rh?schema=public
       JWT_SECRET: segredo-local-apenas-para-teste
       CORS_ORIGIN: http://localhost:5173
+      VAPID_PUBLIC_KEY: BBwnmsv1nmecc0ZNxfEFEKJ81J_X82q_lmmUe_BuKletLaRKny9idZlJvJoVgAF-4ugrRVDObayjbJwP4fKSxw0
+      VAPID_PRIVATE_KEY: gSLFXg9e0lLJ2nIC2tR8JHneHK8Aa2bX38j31sQ1Gqw
+      VAPID_CONTACT: mailto:rh@grupogtf.com.br
     depends_on:
       postgres:
         condition: service_healthy

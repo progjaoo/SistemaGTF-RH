@@ -6,17 +6,15 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
-  Download,
-  FileText,
   Info,
   Minus,
   Plus,
   Save,
   Search,
   Soup,
-  Upload,
   X
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   BulkActions,
   DailyControls,
@@ -44,46 +42,63 @@ import {
   SearchInputWrap,
   SortHint
 } from "../../components/records/styles";
-import { api } from "../../api";
-import { Badge, Button, DataTable, EmptyState, Panel, PanelHeader } from "../../components/ui";
-import { SpreadsheetImport } from "../../components/records/SpreadsheetImport";
+import { api, ApiError } from "../../api";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { DataTable, EmptyState, Panel, PanelHeader } from "../../components/ui";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useMealConfirmationRealtime } from "../../hooks/useMealConfirmationRealtime";
-import type { ApiWarning, BillingPeriod, Employee, MealConfirmationRealtimePayload, MealPrice, MealRecordConfirmation } from "../../types";
+import type { ApiWarning, BillingPeriod, Employee, MealConfirmationRealtimePayload, MealRecordConfirmation } from "../../types";
 import { dateKeyInSaoPaulo, dateRange, fullDate, longDate, weekday } from "../../utils/date";
 import { initials, normalizeSearch } from "../../utils/format";
 import { scheduleLabels } from "../../utils/labels";
-import { buildMealExportSummary, exportMealConferencePdf, exportMealSpreadsheet } from "../../utils/mealReport";
 
 export default function RecordsPage({
   token,
   employees,
-  prices,
   period,
   quantities,
   warnings,
   onChangeQuantity,
-  onSave,
-  onImported
+  onSave
 }: {
   token: string;
   employees: Employee[];
-  prices: MealPrice[];
   period: BillingPeriod;
   quantities: Record<string, number>;
   warnings: ApiWarning[];
   onChangeQuantity: (key: string, value: number) => void;
   onSave: () => Promise<void>;
-  onImported: () => Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
   const [loadingConfirmations, setLoadingConfirmations] = useState(false);
   const [confirmationScope, setConfirmationScope] = useState<"DAY" | "PERIOD" | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "PEGUEI" | "NAO_PEGUEI" | "PENDING">("ALL");
   const [confirmationError, setConfirmationError] = useState("");
   const [confirmations, setConfirmations] = useState<MealRecordConfirmation[]>([]);
+  const [dayClosed, setDayClosed] = useState(false);
+  const [reopenOpen, setReopenOpen] = useState(false);
+  const [dayBusy, setDayBusy] = useState(false);
+  const [closeBlockers, setCloseBlockers] = useState<{ pending: string[]; missing: string[] } | null>(null);
+  const statusCounts = useMemo(() => ({
+    ALL: confirmations.length,
+    PEGUEI: confirmations.filter((c) => c.confirmationStatus === "PEGUEI").length,
+    NAO_PEGUEI: confirmations.filter((c) => c.confirmationStatus === "NAO_PEGUEI").length,
+    PENDING: confirmations.filter((c) => c.confirmationStatus === "PENDING").length,
+  }), [confirmations]);
+  const visibleConfirmations = confirmationScope && statusFilter === "ALL"
+    ? confirmations
+    : confirmations.filter((c) => c.confirmationStatus === statusFilter);
   const [selectedDate, setSelectedDate] = useState(period.startDate);
   const [employeeSearch, setEmployeeSearch] = useState("");
-  const [showImport, setShowImport] = useState(false);
   const debouncedSearch = useDebouncedValue(employeeSearch);
   const dates = useMemo(() => dateRange(period.startDate, period.endDate), [period.startDate, period.endDate]);
   const activeEmployees = useMemo(() => employees.filter((employee) => employee.status === "ACTIVE"), [employees]);
@@ -97,6 +112,21 @@ export default function RecordsPage({
 
     setSelectedDate(today > period.endDate ? period.endDate : period.startDate);
   }, [period.id, period.endDate, period.startDate]);
+
+  useEffect(() => {
+    let active = true;
+    setCloseBlockers(null);
+    api.dayStatus(token, selectedDate)
+      .then((response) => {
+        if (active) setDayClosed(response.closed);
+      })
+      .catch(() => {
+        if (active) setDayClosed(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token, selectedDate]);
 
   const selectedDateIndex = Math.max(0, dates.indexOf(selectedDate));
   const consumptionFrequency = useMemo(() => {
@@ -131,10 +161,6 @@ export default function RecordsPage({
     }
     return map;
   }, [warningsForDate]);
-  const exportSummary = useMemo(
-    () => buildMealExportSummary({ employees: visibleEmployees, dates, prices, quantities }),
-    [dates, prices, quantities, visibleEmployees]
-  );
 
   async function save() {
     setSaving(true);
@@ -148,17 +174,18 @@ export default function RecordsPage({
   const readOnly = period.status === "CLOSED";
   const today = dateKeyInSaoPaulo();
   const selectedDateIsFuture = selectedDate > today;
+  const locked = readOnly || dayClosed || selectedDateIsFuture;
   const moveDate = (direction: -1 | 1) => {
     const nextDate = dates[selectedDateIndex + direction];
     if (nextDate) setSelectedDate(nextDate);
   };
   const changeDailyQuantity = (employee: Employee, nextValue: number) => {
-    if (readOnly || selectedDateIsFuture) return;
+    if (locked) return;
     const key = `${employee.id}:${selectedDate}`;
     onChangeQuantity(key, Math.max(0, Math.min(10, nextValue)));
   };
   const setVisibleQuantity = (quantity: number) => {
-    if (readOnly || selectedDateIsFuture || visibleEmployees.length === 0) return;
+    if (locked || visibleEmployees.length === 0) return;
     for (const employee of visibleEmployees) {
       onChangeQuantity(`${employee.id}:${selectedDate}`, quantity);
     }
@@ -176,6 +203,42 @@ export default function RecordsPage({
       setLoadingConfirmations(false);
     }
   };
+  async function handleCloseDay() {
+    setDayBusy(true);
+    setCloseBlockers(null);
+    try {
+      await api.closeDay(token, selectedDate);
+      toast.success(`Dia ${fullDate(selectedDate)} fechado.`);
+      setDayClosed(true);
+      if (confirmationScope) await loadConfirmations(confirmationScope);
+    } catch (error) {
+      const body = error instanceof ApiError && error.body !== null && typeof error.body === "object"
+        ? error.body as { pending?: unknown; missing?: unknown }
+        : null;
+      const pending = Array.isArray(body?.pending) ? (body.pending as string[]) : [];
+      const missing = Array.isArray(body?.missing) ? (body.missing as string[]) : [];
+      if (pending.length > 0 || missing.length > 0) {
+        setCloseBlockers({ pending, missing });
+        await loadConfirmations("DAY");
+      }
+      toast.error(error instanceof Error ? error.message : "Não foi possível fechar o dia.");
+    } finally {
+      setDayBusy(false);
+    }
+  }
+  async function handleReopenDay() {
+    setDayBusy(true);
+    try {
+      await api.reopenDay(token, selectedDate);
+      toast.success(`Dia ${fullDate(selectedDate)} reaberto.`);
+      setDayClosed(false);
+      setReopenOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível reabrir o dia.");
+    } finally {
+      setDayBusy(false);
+    }
+  }
   const applyRealtimeConfirmation = useCallback((payload: MealConfirmationRealtimePayload) => {
     const nextConfirmation = payload.confirmation;
     if (confirmationScope === "DAY" && nextConfirmation.date !== selectedDate) return;
@@ -216,7 +279,7 @@ export default function RecordsPage({
             <p>{readOnly ? "Período fechado para consulta" : "Registre as refeições do dia"}</p>
           </div>
         </RecordsTitle>
-        <SaveButton type="button" onClick={save} disabled={saving || readOnly || selectedDateIsFuture}>
+        <SaveButton type="button" onClick={save} disabled={saving || locked}>
           <Save size={20} />
           {saving ? "Salvando..." : "Salvar"}
         </SaveButton>
@@ -238,13 +301,41 @@ export default function RecordsPage({
 
         <InfoCard>
           <Info size={18} />
-          <span>Informe a quantidade de refeições para cada colaborador neste dia.</span>
+          <span>A quantidade é ajuste da gestora — no fechamento vale a confirmação (Peguei). Marque o WhatsApp na conferência.</span>
         </InfoCard>
 
         <DailyTotalCard>
           <span>Total do dia</span>
           <strong>{dailyTotal}</strong>
         </DailyTotalCard>
+
+        <div className="col-span-full flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface p-[14px_16px] shadow-[0_18px_48px_rgb(32_38_44/0.08)]">
+          <Badge variant={dayClosed ? "muted" : "good"}>{dayClosed ? "Dia fechado" : "Dia aberto"}</Badge>
+          <span className="text-[0.9rem] font-bold text-muted">Situação de {fullDate(selectedDate)}</span>
+          <span className="flex-1" />
+          <Button type="button" variant="outline" onClick={() => void handleCloseDay()} disabled={dayBusy || readOnly || selectedDateIsFuture || dayClosed}>
+            {dayBusy ? "Fechando..." : "Fechar o dia"}
+          </Button>
+          {dayClosed && (
+            <Button type="button" variant="outline" onClick={() => setReopenOpen(true)}>
+              Reabrir dia
+            </Button>
+          )}
+        </div>
+
+        {closeBlockers && (
+          <div className="col-span-full">
+            <EmptyState>
+              <p className="font-bold">Não foi possível fechar o dia. Resolva na conferência abaixo:</p>
+              {closeBlockers.pending.length > 0 && (
+                <p>Pendentes: {closeBlockers.pending.join(", ")}</p>
+              )}
+              {closeBlockers.missing.length > 0 && (
+                <p>Sem marcação: {closeBlockers.missing.join(", ")}</p>
+              )}
+            </EmptyState>
+          </div>
+        )}
       </DailyControls>
 
       <RecordsTools>
@@ -263,36 +354,20 @@ export default function RecordsPage({
 
         <BulkActions>
           <SortHint>{visibleEmployees.length} exibidos · Mais consumo primeiro, A-Z no empate</SortHint>
-          <Button type="button" onClick={() => setVisibleQuantity(1)} disabled={readOnly || selectedDateIsFuture || visibleEmployees.length === 0}>
+          <Button type="button" onClick={() => setVisibleQuantity(1)} disabled={locked || visibleEmployees.length === 0}>
             <CheckCircle2 size={17} />
             Marcar para todos os {visibleEmployees.length} exibidos
           </Button>
-          <Button type="button" $variant="ghost" onClick={() => setVisibleQuantity(0)} disabled={readOnly || selectedDateIsFuture || visibleEmployees.length === 0}>
+          <Button type="button" variant="outline" onClick={() => setVisibleQuantity(0)} disabled={locked || visibleEmployees.length === 0}>
             <X size={17} />
             Desmarcar exibidos
           </Button>
-          <Button type="button" $variant="ghost" onClick={() => exportMealSpreadsheet(period, exportSummary)} disabled={visibleEmployees.length === 0}>
-            <Download size={17} />
-            Exportar planilha
-          </Button>
-          <Button type="button" $variant="ghost" onClick={() => exportMealConferencePdf(period, exportSummary)} disabled={visibleEmployees.length === 0}>
-            <FileText size={17} />
-            Gerar PDF
-          </Button>
-          <Button type="button" $variant="ghost" onClick={() => setShowImport((current) => !current)} disabled={readOnly}>
-            <Upload size={17} />
-            Importar planilha
-          </Button>
-          <Button type="button" $variant="ghost" onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
+          <Button type="button" variant="outline" onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
             <ClipboardCheck size={17} />
             Verificar quem Pegou
           </Button>
         </BulkActions>
       </RecordsTools>
-
-      {showImport && !readOnly && (
-        <SpreadsheetImport token={token} periodId={period.id} readOnly={readOnly} onImported={onImported} />
-      )}
 
       {confirmationScope && (
         <Panel>
@@ -304,25 +379,37 @@ export default function RecordsPage({
                 {" · Atualiza automaticamente"}
               </p>
             </div>
-            <BulkActions>
-              <Button type="button" $variant={confirmationScope === "DAY" ? "solid" : "ghost"} onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
-                Dia atual
-              </Button>
-              <Button type="button" $variant={confirmationScope === "PERIOD" ? "solid" : "ghost"} onClick={() => loadConfirmations("PERIOD")} disabled={loadingConfirmations}>
-                Período inteiro
-              </Button>
-              <Button type="button" $variant="ghost" onClick={() => setConfirmationScope(null)}>
-                Fechar
-              </Button>
-            </BulkActions>
+            <div className="min-[521px]:contents max-[520px]:w-full">
+              <BulkActions>
+                <Button type="button" variant={confirmationScope === "DAY" ? "primary" : "outline"} onClick={() => loadConfirmations("DAY")} disabled={loadingConfirmations}>
+                  Dia atual
+                </Button>
+                <Button type="button" variant={confirmationScope === "PERIOD" ? "primary" : "outline"} onClick={() => loadConfirmations("PERIOD")} disabled={loadingConfirmations}>
+                  Período inteiro
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setConfirmationScope(null)}>
+                  Fechar
+                </Button>
+              </BulkActions>
+            </div>
           </PanelHeader>
 
           {confirmationError && <EmptyState>{confirmationError}</EmptyState>}
           {!confirmationError && loadingConfirmations && <EmptyState>Carregando confirmações...</EmptyState>}
-          {!confirmationError && !loadingConfirmations && confirmations.length === 0 && (
-            <EmptyState>Nenhum lançamento encontrado para a conferência selecionada.</EmptyState>
+          {!confirmationError && !loadingConfirmations && (
+            <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Filtrar por status">
+              {(["ALL", "PEGUEI", "NAO_PEGUEI", "PENDING"] as const).map((s) => (
+                <Button key={s} type="button" size="sm" variant={statusFilter === s ? "primary" : "outline"}
+                  aria-pressed={statusFilter === s} onClick={() => setStatusFilter(s)}>
+                  {s === "ALL" ? "Todos" : s === "PEGUEI" ? "Pegou" : s === "NAO_PEGUEI" ? "Não pegou" : "Pendente"} ({statusCounts[s]})
+                </Button>
+              ))}
+            </div>
           )}
-          {!confirmationError && !loadingConfirmations && confirmations.length > 0 && (
+          {!confirmationError && !loadingConfirmations && visibleConfirmations.length === 0 && (
+            <EmptyState>Nenhum registro com este status na conferência selecionada.</EmptyState>
+          )}
+          {!confirmationError && !loadingConfirmations && visibleConfirmations.length > 0 && (
             <DataTable>
               <thead>
                 <tr>
@@ -332,21 +419,32 @@ export default function RecordsPage({
                   <th>Status</th>
                   <th>Origem</th>
                   <th>Observação</th>
+                  <th>Marcar</th>
                 </tr>
               </thead>
               <tbody>
-                {confirmations.map((confirmation) => (
+                {visibleConfirmations.map((confirmation) => (
                   <tr key={`${confirmation.employeeId}:${confirmation.date}`}>
                     <td>{confirmation.employeeName}</td>
                     <td>{fullDate(confirmation.date)}</td>
                     <td>{confirmation.quantity}</td>
                     <td>
-                      <Badge $tone={confirmation.confirmationStatus === "PEGUEI" ? "good" : confirmation.confirmationStatus === "NAO_PEGUEI" ? "warn" : "muted"}>
+                      <Badge variant={confirmation.confirmationStatus === "PEGUEI" ? "good" : confirmation.confirmationStatus === "NAO_PEGUEI" ? "warn" : "muted"}>
                         {confirmation.confirmationStatus === "PEGUEI" ? "Peguei" : confirmation.confirmationStatus === "NAO_PEGUEI" ? "Não peguei" : "Pendente"}
                       </Badge>
                     </td>
                     <td>{confirmation.confirmationSource === "SISTEMA" ? "Sistema" : confirmation.confirmationSource === "WHATSAPP" ? "WhatsApp" : "Sem confirmação"}</td>
                     <td>{confirmation.confirmationNote ?? "—"}</td>
+                    <td>
+                      <div className="flex gap-1 whitespace-nowrap">
+                        <Button type="button" size="sm" title="Marcar pegou (WhatsApp)" disabled={locked} onClick={async () => { await api.setConfirmation(token, { employeeId: confirmation.employeeId, date: confirmation.date, status: "PEGUEI" }); await loadConfirmations(confirmationScope ?? "DAY"); }}>
+                          Pegou
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" title="Marcar não pegou (WhatsApp)" disabled={locked} onClick={async () => { await api.setConfirmation(token, { employeeId: confirmation.employeeId, date: confirmation.date, status: "NAO_PEGUEI" }); await loadConfirmations(confirmationScope ?? "DAY"); }}>
+                          Não
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -364,7 +462,7 @@ export default function RecordsPage({
           const warning = warningByEmployee.get(employee.id);
 
           return (
-            <EmployeeMealCard key={employee.id} $warn={Boolean(warning)}>
+            <EmployeeMealCard key={employee.id} warn={Boolean(warning)}>
               <EmployeeIdentity>
                 <EmployeeInitials aria-hidden="true">{initials(employee.name)}</EmployeeInitials>
                 <div>
@@ -377,7 +475,7 @@ export default function RecordsPage({
                 <QuantityButton
                   type="button"
                   onClick={() => changeDailyQuantity(employee, quantity - 1)}
-                  disabled={readOnly || selectedDateIsFuture || quantity <= 0}
+                  disabled={locked || quantity <= 0}
                   aria-label={`Diminuir refeições de ${employee.name}`}
                 >
                   <Minus size={20} />
@@ -389,7 +487,7 @@ export default function RecordsPage({
                 <QuantityButton
                   type="button"
                   onClick={() => changeDailyQuantity(employee, quantity + 1)}
-                  disabled={readOnly || selectedDateIsFuture || quantity >= 10}
+                  disabled={locked || quantity >= 10}
                   aria-label={`Aumentar refeições de ${employee.name}`}
                 >
                   <Plus size={20} />
@@ -416,6 +514,25 @@ export default function RecordsPage({
             : `Os registros são salvos apenas para ${fullDate(selectedDate)}.`}
         </span>
       </SaveStatus>
+
+      <Dialog open={reopenOpen} onOpenChange={(open) => { if (!open) setReopenOpen(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reabrir dia</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja reabrir <strong>{fullDate(selectedDate)}</strong>? Os lançamentos voltarão a ficar editáveis.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setReopenOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="danger" onClick={() => void handleReopenDay()} disabled={dayBusy}>
+              Reabrir dia
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </RecordsLayout>
   );
 }

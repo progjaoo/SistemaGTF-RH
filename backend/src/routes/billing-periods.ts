@@ -1,4 +1,3 @@
-import ExcelJS from "exceljs";
 import { BillingStatus, Role } from "@prisma/client";
 import express from "express";
 import { z } from "zod";
@@ -7,6 +6,7 @@ import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { authenticate, requireRole, type AuthenticatedRequest } from "../middleware/auth.js";
 import { calculatePeriodSummary, serializePeriod } from "../services/calculations.js";
+import { buildReportHtml, buildXlsxBuffer } from "../services/report-files.js";
 import { sanitizeReportFilename, buildPeriodPdf } from "../services/report-pdf.js";
 
 export const billingPeriodsRouter = express.Router();
@@ -57,7 +57,7 @@ billingPeriodsRouter.get("/", asyncHandler(async (_req, res) => {
   res.json({ periods: periods.map(serializePeriod) });
 }));
 
-billingPeriodsRouter.post("/", requireRole(Role.RH), asyncHandler(async (req, res) => {
+billingPeriodsRouter.post("/", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const input = periodSchema.parse(req.body);
   const startDate = parseDate(input.startDate);
@@ -91,7 +91,7 @@ const bulkYearSchema = z.object({
 // Gera os 12 períodos mensais de um ano de uma vez (RH).
 // Atômico: qualquer sobreposição com período existente aborta tudo (409)
 // listando os conflitos — nada é criado.
-billingPeriodsRouter.post("/bulk-year", requireRole(Role.RH), asyncHandler(async (req, res) => {
+billingPeriodsRouter.post("/bulk-year", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const input = bulkYearSchema.parse(req.body);
   const planned = buildYearPeriods(input.year, input.cutDay, input.labelPrefix);
@@ -139,7 +139,7 @@ billingPeriodsRouter.post("/bulk-year", requireRole(Role.RH), asyncHandler(async
   res.status(201).json({ periods: created.map(serializePeriod) });
 }));
 
-billingPeriodsRouter.post("/:id/close", requireRole(Role.RH), asyncHandler(async (req, res) => {
+billingPeriodsRouter.post("/:id/close", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const period = await prisma.billingPeriod.findUnique({ where: { id: req.params.id } });
 
@@ -175,7 +175,7 @@ billingPeriodsRouter.post("/:id/close", requireRole(Role.RH), asyncHandler(async
   res.json({ period: serializePeriod(closed), summary });
 }));
 
-billingPeriodsRouter.post("/:id/reopen", requireRole(Role.RH), asyncHandler(async (req, res) => {
+billingPeriodsRouter.post("/:id/reopen", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
   const period = await prisma.billingPeriod.findUnique({ where: { id: req.params.id } });
 
@@ -224,31 +224,17 @@ billingPeriodsRouter.get("/:id/report", asyncHandler(async (req, res) => {
     return res.send(buffer);
   }
 
+  if (req.query.format === "html") {
+    const html = buildReportHtml(summary);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.send(html);
+  }
+
   if (req.query.format !== "xlsx") {
     return res.json({ report: summary });
   }
 
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Relatorio");
-
-  sheet.columns = [
-    { header: "Funcionario", key: "employeeName", width: 30 },
-    { header: "Quantidade", key: "quantity", width: 14 },
-    { header: "Preco(s) aplicado(s)", key: "unitPrices", width: 22 },
-    { header: "Valor a descontar", key: "amount", width: 20 }
-  ];
-  sheet.getRow(1).font = { bold: true };
-  sheet.addRows(summary.employeeTotals.map((item) => ({
-    employeeName: item.employeeName,
-    quantity: item.quantity,
-    unitPrices: item.unitPrices.map((price) => `R$ ${price.toFixed(2)}`).join(", "),
-    amount: item.amount
-  })));
-  sheet.addRow({});
-  sheet.addRow({ employeeName: "Total geral", quantity: summary.totalQuantity, amount: summary.totalAmount });
-  sheet.getColumn("amount").numFmt = '"R$"#,##0.00';
-
-  const buffer = await workbook.xlsx.writeBuffer();
+  const buffer = await buildXlsxBuffer(summary);
 
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="${summary.period.label}.xlsx"`);

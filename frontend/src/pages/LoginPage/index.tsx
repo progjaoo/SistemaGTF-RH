@@ -1,12 +1,12 @@
 import { FormEvent, useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import styled from "styled-components";
-import { Button, Field, InlineError } from "../../components/ui";
+import { Button } from "@/components/ui/button";
 import logoGtf from "../../images/logogtf.png";
 
-export default function LoginPage({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
+export default function LoginPage({ onLogin }: { onLogin: (email: string, password: string, remember?: boolean) => Promise<void> }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -15,7 +15,7 @@ export default function LoginPage({ onLogin }: { onLogin: (email: string, passwo
     setSubmitting(true);
     setError("");
     try {
-      await onLogin(email, password);
+      await onLogin(email, password, remember);
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : "Não foi possível entrar.");
     } finally {
@@ -24,26 +24,26 @@ export default function LoginPage({ onLogin }: { onLogin: (email: string, passwo
   }
 
   return (
-    <LoginLayout>
-      <LoginShell>
-        <LoginIntro>
-          <LogoBlock>
-            <img src={logoGtf} alt="Grupo GTF" />
-          </LogoBlock>
-          <IntroCopy>
-            <span>GTF - Recursos Humanos</span>
-            <strong>Controle de Almoços</strong>
-          </IntroCopy>
-        </LoginIntro>
+    <main className="grid min-h-[100dvh] place-items-center bg-[radial-gradient(circle_at_28%_24%,rgb(60_196_189/0.25),transparent_32%),linear-gradient(135deg,#1E8C86_0%,#145e59_55%,#0c3a37_100%)] px-[clamp(18px,4vw,52px)]">
+      <section className="grid w-[min(1100px,100%)] overflow-hidden rounded-[28px] bg-[#0e2f2c] shadow-2xl min-h-[min(600px,calc(100dvh-72px))] md:grid-cols-[1.08fr_0.82fr] max-md:min-h-0 max-md:rounded-[22px] max-md:grid-cols-1">
+        <aside className="flex min-w-0 flex-col justify-between gap-[38px] bg-[linear-gradient(160deg,rgb(43_168_162/0.25),transparent_48%),#0a2422] p-[clamp(32px,4.2vw,52px)] text-white max-md:gap-[26px] max-md:p-7 max-sm:p-[22px]">
+          <div className="inline-flex w-56 max-w-[48vw]">
+            <img src={logoGtf} alt="Grupo GTF" className="block h-auto w-full object-contain" />
+          </div>
+          <div className="max-w-[470px]">
+            <span className="block text-[clamp(0.6rem,1vw,0.92rem)] font-bold uppercase text-teal-hover">GTF - Recursos Humanos</span>
+            <strong className="mt-[14px] block font-display text-[clamp(1rem,2.5vw,4.5rem)] font-bold uppercase leading-[0.98] text-white max-md:mt-[10px] max-md:text-[clamp(2rem,9vw,3.4rem)]">Controle de Almoços</strong>
+          </div>
+        </aside>
 
-        <LoginPanel>
-          <FormHeader>
-            <h1>Entrar no painel</h1>
-          </FormHeader>
+        <section className="flex min-w-0 flex-col items-center justify-center rounded-r-[28px] bg-surface p-[clamp(34px,4.2vw,56px)] max-md:rounded-none max-sm:p-6">
+          <div className="mb-[26px] w-[min(390px,100%)]">
+            <h1 className="m-0 font-display text-[clamp(1rem,2vw,1.45rem)] font-bold leading-none text-ink">Entrar no painel</h1>
+          </div>
 
-          <LoginForm onSubmit={submit}>
-            <LoginField>
-              <label htmlFor="email">Email</label>
+          <form onSubmit={submit} className="grid w-[min(390px,100%)] gap-4">
+            <div className="grid gap-[9px]">
+              <label htmlFor="email" className="text-[0.82rem] font-semibold uppercase text-[#8aa0b5]">Email</label>
               <input
                 id="email"
                 type="email"
@@ -52,11 +52,12 @@ export default function LoginPage({ onLogin }: { onLogin: (email: string, passwo
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
+                className="min-h-[45px] rounded-[10px] border border-[#dce4ec] bg-cream px-4 py-3 text-[1.05rem] text-ink shadow-[inset_0_0_0_1px_rgb(220_228_236/0.35)] placeholder:text-[#8a929b] focus:border-teal focus:outline-none"
               />
-            </LoginField>
+            </div>
 
-            <LoginField>
-              <label htmlFor="password">Senha</label>
+            <div className="grid gap-[9px]">
+              <label htmlFor="password" className="text-[0.82rem] font-semibold uppercase text-[#8aa0b5]">Senha</label>
               <input
                 id="password"
                 type="password"
@@ -64,190 +65,30 @@ export default function LoginPage({ onLogin }: { onLogin: (email: string, passwo
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
+                className="min-h-[45px] rounded-[10px] border border-[#dce4ec] bg-cream px-4 py-3 text-[1.05rem] text-ink shadow-[inset_0_0_0_1px_rgb(220_228_236/0.35)] placeholder:text-[#8a929b] focus:border-teal focus:outline-none"
               />
-            </LoginField>
+            </div>
 
-            {error && <LoginError>{error}</LoginError>}
+            {error && <div role="alert" className="rounded-[10px] border border-danger/30 bg-danger/5 px-[14px] py-3 text-[0.92rem] font-bold text-danger-ink">{error}</div>}
 
-            <LoginButton type="submit" disabled={submitting}>
+            <label className="flex cursor-pointer items-center gap-2 text-[0.92rem] font-semibold text-[#5b6b7c]">
+              <input
+                id="remember"
+                type="checkbox"
+                checked={remember}
+                onChange={(event) => setRemember(event.target.checked)}
+                className="h-4 w-4 accent-teal"
+              />
+              Manter conectado neste aparelho
+            </label>
+
+            <Button type="submit" variant="primary" size="lg" disabled={submitting} className="mt-2 w-full text-base">
               <ShieldCheck size={18} />
               {submitting ? "Entrando..." : "Entrar"}
-            </LoginButton>
-          </LoginForm>
-        </LoginPanel>
-      </LoginShell>
-    </LoginLayout>
+            </Button>
+          </form>
+        </section>
+      </section>
+    </main>
   );
 }
-
-const LoginLayout = styled.main`
-  display: grid;
-  min-height: 100vh;
-  place-items: center;
-  padding: clamp(18px, 4vw, 52px);
-  background:
-    radial-gradient(circle at 28% 24%, rgba(47, 135, 122, 0.16), transparent 32%),
-    linear-gradient(135deg, #081723 0%, #13283a 55%, #0c1b29 100%);
-`;
-
-const LoginShell = styled.section`
-  display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(380px, 0.82fr);
-  width: min(1100px, 100%);
-  min-height: min(600px, calc(100vh - 72px));
-  overflow: hidden;
-  border-radius: 28px;
-  background: #0b1b29;
-  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.32);
-
-  @media (max-width: 920px) {
-    grid-template-columns: 1fr;
-    min-height: auto;
-    border-radius: 22px;
-  }
-`;
-
-const LoginIntro = styled.aside`
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 38px;
-  min-width: 0;
-  padding: clamp(32px, 4.2vw, 52px);
-  background:
-    linear-gradient(160deg, rgba(15, 118, 110, 0.22), transparent 48%),
-    #071724;
-  color: #fff;
-
-  @media (max-width: 920px) {
-    gap: 26px;
-    padding: 28px;
-  }
-
-  @media (max-width: 520px) {
-    padding: 22px;
-  }
-`;
-
-const LogoBlock = styled.div`
-  display: inline-flex;
-  width: 224px;
-  max-width: 48vw;
-
-  img {
-    display: block;
-    width: 100%;
-    height: auto;
-    object-fit: contain;
-  }
-`;
-
-const IntroCopy = styled.div`
-  max-width: 470px;
-
-  span {
-    display: block;
-    color: #2f8f7f;
-    font-size: clamp(0.6rem, 1vw, 0.92rem);
-    font-weight: 700;
-    text-transform: uppercase;
-  }
-
-  strong {
-    display: block;
-    margin-top: 14px;
-    color: #fff;
-    font-size: clamp(1.00rem, 2.5vw, 4.00rem);
-    font-weight: 950;
-    line-height: 0.98;
-    text-transform: uppercase;
-  }
-
-  @media (max-width: 920px) {
-    strong {
-      margin-top: 10px;
-      font-size: clamp(2rem, 9vw, 3.4rem);
-    }
-  }
-`;
-
-const LoginPanel = styled.section`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  padding: clamp(34px, 4.2vw, 56px);
-  border-radius: 0 28px 28px 0;
-  background: #fff;
-
-  @media (max-width: 920px) {
-    border-radius: 0;
-  }
-
-  @media (max-width: 520px) {
-    padding: 24px;
-  }
-`;
-
-const FormHeader = styled.div`
-  width: min(390px, 100%);
-  margin-bottom: 26px;
-
-  h1 {
-    margin: 0;
-    color: #101923;
-    font-size: clamp(1rem, 2vw, 1.45rem);
-    font-weight: 1000;
-    line-height: 1;
-  }
-`;
-
-const LoginForm = styled.form`
-  width: min(390px, 100%);
-  display: grid;
-  gap: 16px;
-`;
-
-const LoginField = styled(Field)`
-  gap: 9px;
-
-  label {
-    color: #8aa0b5;
-    font-size: 0.82rem;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-
-  input {
-    min-height: 45px;
-    padding: 12px 16px;
-    border-color: #dce4ec;
-    border-radius: 10px;
-    background: #fbfcfd;
-    color: #101923;
-    font-size: 1.05rem;
-    box-shadow: inset 0 0 0 1px rgba(220, 228, 236, 0.35);
-
-    &::placeholder {
-      color: #8a929b;
-    }
-  }
-`;
-
-const LoginButton = styled(Button)`
-  width: 100%;
-  min-height: 52px;
-  margin-top: 8px;
-  border-radius: 10px;
-  font-size: 1rem;
-`;
-
-const LoginError = styled(InlineError)`
-  padding: 12px 14px;
-  border: 1px solid #fecaca;
-  border-radius: 10px;
-  background: #fff1f2;
-  color: #b91c1c;
-  font-size: 0.92rem;
-`;

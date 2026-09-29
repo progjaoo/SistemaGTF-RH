@@ -6,8 +6,11 @@ export default defineConfig({
   test: {
     environment: "node",
     setupFiles: ["./tests/setup.ts"],
-    testTimeout: 30000
+    testTimeout: 30000,
     // Arquivos em sequência no mesmo processo: os testes de API dividem
     // um banco dedicado e preços globais afetam todos os períodos.
+    // fileParallelism=false é obrigatório: com arquivos em paralelo os
+    // bancos compartilhados causam 401/FK aleatórios (flaky).
+    fileParallelism: false
   }
 });

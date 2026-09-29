@@ -10,6 +10,7 @@ import type {
   MealRecordConfirmation,
   ConfirmationStatus,
   ImportResult,
+  PeriodSummary,
   Role,
   Session,
   User
@@ -38,23 +39,35 @@ async function request<T>(path: string, token?: string, init: RequestInit = {}):
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: "Erro ao comunicar com a API." }));
-    throw new Error(error.message ?? "Erro ao comunicar com a API.");
+    throw new ApiError(error.message ?? "Erro ao comunicar com a API.", response.status, error);
   }
 
   return response.json() as Promise<T>;
 }
 
+export class ApiError extends Error {
+  status: number;
+  body: unknown;
+
+  constructor(message: string, status: number, body: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
 export const api = {
-  login(email: string, password: string) {
+  login(email: string, password: string, remember = false) {
     return request<Session>("/auth/login", undefined, {
       method: "POST",
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, remember })
     });
   },
   employees(token: string) {
     return request<{ employees: Employee[] }>("/employees", token);
   },
-  saveEmployee(token: string, payload: Omit<Employee, "id" | "hasAccessCode">, id?: string) {
+  saveEmployee(token: string, payload: Omit<Employee, "id" | "hasAccessCode" | "portalAccess" | "lastPortalAccessAt">, id?: string) {
     return request<{ employee: Employee }>(id ? `/employees/${id}` : "/employees", token, {
       method: id ? "PUT" : "POST",
       body: JSON.stringify(payload)
@@ -70,6 +83,18 @@ export const api = {
     return request<{ price: MealPrice }>("/meal-prices", token, {
       method: "POST",
       body: JSON.stringify(payload)
+    });
+  },
+  updateMealPrice(token: string, id: string, payload: { value: number; validFrom: string; validTo?: string | null; employeeId?: string | null }) {
+    return request<{ price: MealPrice }>(`/meal-prices/${id}`, token, {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    });
+  },
+  closeMealPrice(token: string, id: string, endDate: string) {
+    return request<{ price: MealPrice }>(`/meal-prices/${id}/close`, token, {
+      method: "POST",
+      body: JSON.stringify({ endDate })
     });
   },
   periods(token: string) {
@@ -118,13 +143,43 @@ export const api = {
     if (date) params.set("date", date);
     return request<{ confirmations: MealRecordConfirmation[] }>(`/meal-records/confirmations?${params.toString()}`, token);
   },
+  pushVapidKey(token: string, employeeId: string) {
+    return request<{ publicKey: string }>(`/employee-portal/${employeeId}/push/vapid-key`, token);
+  },
+  pushSubscribe(token: string, employeeId: string, payload: { endpoint: string; keys: { p256dh: string; auth: string } }) {
+    return request<{ subscription: { id: string; endpoint: string } }>(`/employee-portal/${employeeId}/push/subscriptions`, token, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+  pushUnsubscribe(token: string, employeeId: string, endpoint: string) {
+    return request<{ ok: boolean }>(`/employee-portal/${employeeId}/push/subscriptions`, token, {
+      method: "DELETE",
+      body: JSON.stringify({ endpoint })
+    });
+  },
+  setConfirmation(token: string, payload: { employeeId: string; date: string; status: "PEGUEI" | "NAO_PEGUEI"; note?: string }) {
+    return request<{ confirmation: MealRecordConfirmation }>("/meal-records/confirmations", token, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  },
+  dayStatus(token: string, date: string) {
+    return request<{ date: string; closed: boolean }>(`/meal-records/day-status?date=${date}`, token);
+  },
+  closeDay(token: string, date: string) {
+    return request<{ dayClose: { date: string; closedAt: string } }>("/meal-records/day-close", token, { method: "POST", body: JSON.stringify({ date }) });
+  },
+  reopenDay(token: string, date: string) {
+    return request<{ ok: boolean }>("/meal-records/day-reopen", token, { method: "POST", body: JSON.stringify({ date }) });
+  },
   employeePortalSearch(name: string) {
     return request<{ employees: EmployeePortalSearchResult[] }>(`/employee-portal/search?name=${encodeURIComponent(name)}`);
   },
-  employeePortalLogin(employeeId: string, code: string) {
-    return request<{ token: string; employee: EmployeePortalSearchResult }>(`/employee-portal/login`, undefined, {
+  employeePortalLogin(employeeId: string, code: string, remember = false) {
+    return request<{ token: string; employee: EmployeePortalSearchResult; portalStatus: "pending" | "active" }>(`/employee-portal/login`, undefined, {
       method: "POST",
-      body: JSON.stringify({ employeeId, code })
+      body: JSON.stringify({ employeeId, code, remember })
     });
   },
   employeePortalCalendar(employeeId: string, month: string, portalToken: string) {
@@ -168,8 +223,18 @@ export const api = {
       body: JSON.stringify(payload)
     });
   },
-  async downloadReport(token: string, period: BillingPeriod) {
-    const response = await fetch(`${API_BASE}/billing-periods/${period.id}/report?format=xlsx`, {
+  // Resumo JSON instantâneo para a prévia inline (sem disparar download).
+  periodReportSummary(token: string, periodId: string): Promise<PeriodSummary> {
+    return request<{ report: PeriodSummary }>(`/billing-periods/${periodId}/report?format=json`, token).then(
+      ({ report }) => report
+    );
+  },
+  rangeReportSummary(token: string, range: { start: string; end: string }): Promise<PeriodSummary> {
+    const params = new URLSearchParams({ start: range.start, end: range.end, format: "json" });
+    return request<{ report: PeriodSummary }>(`/reports?${params.toString()}`, token).then(({ report }) => report);
+  },
+  async downloadReport(token: string, period: BillingPeriod, format: "xlsx" | "pdf" = "xlsx") {
+    const response = await fetch(`${API_BASE}/billing-periods/${period.id}/report?format=${format}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!response.ok) throw new Error("Não foi possível exportar o relatório.");
@@ -177,8 +242,48 @@ export const api = {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${period.label}.xlsx`;
+    anchor.download = `${period.label}.${format}`;
     anchor.click();
     URL.revokeObjectURL(url);
+  },
+  async downloadRangeReport(token: string, range: { start: string; end: string; format: "xlsx" | "pdf" }) {
+    const params = new URLSearchParams({ start: range.start, end: range.end, format: range.format });
+    const response = await fetch(`${API_BASE}/reports?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error("Não foi possível gerar o relatório.");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `relatorio_${range.start.replace(/-/g, "")}_a_${range.end.replace(/-/g, "")}.${range.format}`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  },
+  // Prévia em nova aba: abre a janela de forma síncrona no clique (evita
+  // bloqueio de popup) e injeta o HTML buscado com o token.
+  async openReportPreview(token: string, path: string) {
+    const popup = window.open("about:blank", "_blank");
+    if (!popup) throw new Error("Permita popups para abrir a prévia.");
+    try {
+      const response = await fetch(`${API_BASE}${path}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Não foi possível gerar a prévia.");
+      const html = await response.text();
+      popup.document.open();
+      popup.document.write(html);
+      popup.document.close();
+    } catch (error) {
+      popup.close();
+      throw error;
+    }
+  },
+  openPeriodPreview(token: string, periodId: string) {
+    return api.openReportPreview(token, `/billing-periods/${periodId}/report?format=html`);
+  },
+  openRangePreview(token: string, range: { start: string; end: string }) {
+    const params = new URLSearchParams({ start: range.start, end: range.end, format: "html" });
+    return api.openReportPreview(token, `/reports?${params.toString()}`);
   }
 };

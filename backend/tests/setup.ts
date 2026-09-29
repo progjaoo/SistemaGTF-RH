@@ -36,3 +36,14 @@ execSync("npx prisma migrate deploy", {
   stdio: "pipe",
   env: { ...process.env, DATABASE_URL: url }
 });
+
+// Banco dedicado: parte de zero absoluto a cada run (restos de runs
+// abortados não podem vazar entre arquivos).
+const clean = new PrismaClient({ datasources: { db: { url } } });
+try {
+  await clean.$executeRawUnsafe(
+    'TRUNCATE "AuditLog", "MealRecord", "MealPrice", "BillingPeriod", "Employee", "User" CASCADE'
+  );
+} finally {
+  await clean.$disconnect();
+}

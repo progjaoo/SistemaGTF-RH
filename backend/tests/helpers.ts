@@ -4,6 +4,41 @@ import bcrypt from "bcryptjs";
 import { Role } from "@prisma/client";
 import { prisma } from "../src/lib/prisma.js";
 
+// PLAN-013 Task 5: cobertura estrutural do conteúdo do PDF (sem nova dep).
+// Extrai texto aproximado do buffer gerado pelo pdfkit com compress:false:
+// junta fragmentos hexadecimais `<...>` e literais `(...)` dos content
+// streams, decodificando como latin1 (= WinAnsi p/ acentos pt-BR comuns:
+// ã/ç/é/í/ó/ú ocupam os mesmos code points).
+// LIMITE HONESTO: é verificação estrutural (labels/valores presentes), não
+// validação de layout — a conferência visual final é passo humano.
+export function pdfTextOf(buffer: Buffer): string {
+  const raw = buffer.toString("latin1");
+  const streams: string[] = [];
+  const streamRe = /stream\r?\n([\s\S]*?)endstream/g;
+  let streamMatch: RegExpExecArray | null;
+  while ((streamMatch = streamRe.exec(raw)) !== null) streams.push(streamMatch[1]);
+  const parts: string[] = [];
+  const tokenRe = /<([0-9a-fA-F]+)>|\((?:\\.|[^\\()])*\)/g;
+  for (const content of streams) {
+    let tokenMatch: RegExpExecArray | null;
+    while ((tokenMatch = tokenRe.exec(content)) !== null) {
+      if (tokenMatch[1] !== undefined) {
+        const hex = tokenMatch[1].length % 2 ? `${tokenMatch[1]}0` : tokenMatch[1];
+        parts.push(Buffer.from(hex, "hex").toString("latin1"));
+      } else {
+        parts.push(
+          tokenMatch[0].slice(1, -1)
+            .replace(/\\([0-7]{1,3})/g, (_m, oct: string) => String.fromCharCode(parseInt(oct, 8)))
+            .replace(/\\([\\()])/g, "$1")
+        );
+      }
+    }
+    parts.push("\n");
+  }
+  return parts.join("");
+}
+
+
 export const d = (value: string) => new Date(`${value}T00:00:00.000Z`);
 
 export async function createUser(suffix: string, role: Role) {
