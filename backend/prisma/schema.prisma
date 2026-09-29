@@ -43,6 +43,10 @@ model Employee {
   // Ativação do portal (PLAN-003): preenchido no primeiro login com código.
   // Null = pendente (código gerado, nunca usado).
   firstPortalAccessAt DateTime?
+  // Último login no portal (atualizado a cada login ok). Null = nunca entrou.
+  lastPortalAccessAt DateTime?
+  // Função/cargo do colaborador (editável no CRUD). Null = não informado.
+  jobTitle          String?        @db.VarChar(60)
   admissionDate   DateTime?      @db.Date
   terminationDate DateTime?      @db.Date
   createdAt       DateTime       @default(now())

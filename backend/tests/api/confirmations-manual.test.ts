@@ -52,3 +52,35 @@ describe("manual confirmation", () => {
     expect((await request(app).post("/api/meal-records/confirmations").send({ employeeId, date: "2021-06-11", status: "PEGUEI" })).status).toBe(401);
   });
 });
+
+describe("conference lists missing employees as PENDING (PLAN-011 Task 4)", () => {
+  let missingId = "";
+  let missingName = "";
+
+  it("com date: ativo sem record aparece PENDING zerado", async () => {
+    const extra = await createEmployee(`${TAG}-faltante`);
+    missingId = extra.id;
+    missingName = extra.name;
+    ids.employeeIds.push(extra.id);
+    const res = await request(app).get(`/api/meal-records/confirmations?periodId=${periodId}&date=2021-06-10`)
+      .set("Authorization", `Bearer ${gestToken}`);
+    expect(res.status).toBe(200);
+    const row = res.body.confirmations.find((c) => c.employeeId === missingId);
+    expect(row).toMatchObject({
+      employeeName: missingName,
+      date: "2021-06-10",
+      quantity: 0,
+      confirmationStatus: "PENDING",
+      confirmationSource: null,
+      confirmationNote: null,
+      confirmedAt: null
+    });
+  });
+
+  it("sem date (escopo período): comportamento inalterado, sem PENDING sintético", async () => {
+    const res = await request(app).get(`/api/meal-records/confirmations?periodId=${periodId}`)
+      .set("Authorization", `Bearer ${gestToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.confirmations.filter((c) => c.employeeId === missingId)).toHaveLength(0);
+  });
+});

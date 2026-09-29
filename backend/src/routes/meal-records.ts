@@ -99,6 +99,14 @@ mealRecordsRouter.get("/confirmations", asyncHandler(async (req, res) => {
     ORDER BY mr."date" ASC, e."name" ASC
   `);
 
+  const byDateThenName = (
+    first: { date: string; employeeName: string },
+    second: { date: string; employeeName: string }
+  ) => {
+    if (first.date !== second.date) return first.date.localeCompare(second.date);
+    return first.employeeName.localeCompare(second.employeeName, "pt-BR", { sensitivity: "base" });
+  };
+
   const confirmations = records
     .map((record) => ({
       employeeId: record.employeeId,
@@ -110,10 +118,28 @@ mealRecordsRouter.get("/confirmations", asyncHandler(async (req, res) => {
       confirmationNote: record.confirmationNote,
       confirmedAt: record.confirmedAt?.toISOString() ?? null
     }))
-    .sort((first, second) => {
-      if (first.date !== second.date) return first.date.localeCompare(second.date);
-      return first.employeeName.localeCompare(second.employeeName, "pt-BR", { sensitivity: "base" });
-    });
+    .sort(byDateThenName);
+
+  // Com date: ativos sem record na data entram como PENDING zerado.
+  // Sem date (escopo período): inalterado — dia × funcionário explodiria.
+  if (dateQuery) {
+    const present = new Set(records.map((record) => record.employeeId));
+    const actives = await prisma.employee.findMany({ where: { status: "ACTIVE" } });
+    for (const employee of actives) {
+      if (present.has(employee.id)) continue;
+      confirmations.push({
+        employeeId: employee.id,
+        employeeName: employee.name,
+        date: dateQuery,
+        quantity: 0,
+        confirmationStatus: "PENDING" as const,
+        confirmationSource: null,
+        confirmationNote: null,
+        confirmedAt: null
+      });
+    }
+    confirmations.sort(byDateThenName);
+  }
 
   res.json({ confirmations });
 }));

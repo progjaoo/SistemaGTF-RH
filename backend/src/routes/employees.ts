@@ -24,6 +24,7 @@ const employeeSchema = z.object({
   status: z.nativeEnum(EmployeeStatus).optional(),
   scheduleType: z.nativeEnum(ScheduleType),
   workdays: workdaysSchema,
+  jobTitle: z.string().trim().max(60).optional().nullable(),
   admissionDate: z.string().optional().nullable(),
   terminationDate: z.string().optional().nullable()
 });
@@ -49,8 +50,10 @@ const serializeEmployee = (employee: {
   status: EmployeeStatus;
   scheduleType: ScheduleType;
   workdays: string | null;
+  jobTitle: string | null;
   accessCodeHash: string | null;
   firstPortalAccessAt: Date | null;
+  lastPortalAccessAt: Date | null;
   admissionDate: Date | null;
   terminationDate: Date | null;
   createdAt: Date;
@@ -61,9 +64,11 @@ const serializeEmployee = (employee: {
   status: employee.status,
   scheduleType: employee.scheduleType,
   workdays: serializeWorkdays(employee.workdays),
+  jobTitle: employee.jobTitle,
   // Nunca expor accessCodeHash: só sinalizadores.
   hasAccessCode: employee.accessCodeHash !== null,
   portalAccess: (!employee.accessCodeHash ? "none" : !employee.firstPortalAccessAt ? "pending" : "active") as "none" | "pending" | "active",
+  lastPortalAccessAt: employee.lastPortalAccessAt?.toISOString() ?? null,
   admissionDate: employee.admissionDate?.toISOString().slice(0, 10) ?? null,
   terminationDate: employee.terminationDate?.toISOString().slice(0, 10) ?? null
 });
@@ -92,6 +97,7 @@ employeesRouter.post("/", requireRole(Role.RH), asyncHandler(async (req, res) =>
       status: input.status ?? EmployeeStatus.ACTIVE,
       scheduleType: input.scheduleType,
       workdays: deserializeWorkdays(input.workdays),
+      jobTitle: input.jobTitle ?? null,
       admissionDate: input.admissionDate ? parseDate(input.admissionDate) : null,
       terminationDate: input.terminationDate ? parseDate(input.terminationDate) : null
     }
@@ -114,6 +120,7 @@ employeesRouter.put("/:id", requireRole(Role.RH), asyncHandler(async (req, res) 
       status: input.status ?? EmployeeStatus.ACTIVE,
       scheduleType: input.scheduleType,
       workdays: deserializeWorkdays(input.workdays),
+      jobTitle: input.jobTitle ?? null,
       admissionDate: input.admissionDate ? parseDate(input.admissionDate) : null,
       terminationDate: input.terminationDate ? parseDate(input.terminationDate) : null
     }

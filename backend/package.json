@@ -12,7 +12,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
-    "seed:employees:gtf": "tsx prisma/seed-employees-grupo-gtf.ts"
+    "seed:employees:gtf": "tsx prisma/seed-employees-grupo-gtf.ts",
+    "sync:employees:gtf": "tsx prisma/sync-employees-gtf.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.10.1",

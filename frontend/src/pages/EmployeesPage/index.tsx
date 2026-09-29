@@ -18,6 +18,14 @@ import { cn } from "@/lib/utils";
 import type { Employee, EmployeeStatus, ScheduleType } from "../../types";
 import { scheduleLabels, statusLabels, workdayLabel } from "../../utils/labels";
 
+function lastAccessLabel(iso: string | null): string {
+  if (!iso) return "Nunca entrou";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days <= 0) return "Hoje";
+  if (days === 1) return "Há 1 dia";
+  return `Há ${days} dias`;
+}
+
 const WEEKDAYS = [
   { value: 1, label: "Seg" },
   { value: 2, label: "Ter" },
@@ -39,16 +47,17 @@ export default function EmployeesPage({
   employees: Employee[];
   canEdit: boolean;
   token: string;
-  onSave: (payload: Omit<Employee, "id" | "hasAccessCode" | "portalAccess">, id?: string) => Promise<void>;
+  onSave: (payload: Omit<Employee, "id" | "hasAccessCode" | "portalAccess" | "lastPortalAccessAt">, id?: string) => Promise<void>;
   onInactivate: (id: string) => Promise<void>;
   onReload: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState<Employee | null>(null);
-  const [form, setForm] = useState<Omit<Employee, "id" | "portalAccess">>({
+  const [form, setForm] = useState<Omit<Employee, "id" | "portalAccess" | "lastPortalAccessAt">>({
     name: "",
     status: "ACTIVE",
     scheduleType: "MON_FRI",
     workdays: null,
+    jobTitle: null,
     hasAccessCode: false,
     admissionDate: "",
     terminationDate: ""
@@ -71,6 +80,7 @@ export default function EmployeesPage({
       status: employee.status,
       scheduleType: employee.scheduleType,
       workdays: employee.workdays ?? null,
+      jobTitle: employee.jobTitle ?? null,
       hasAccessCode: employee.hasAccessCode,
       admissionDate: employee.admissionDate ?? "",
       terminationDate: employee.terminationDate ?? ""
@@ -87,11 +97,12 @@ export default function EmployeesPage({
       // Dias explícitos só valem na jornada personalizada; nos demais
       // tipos o campo é limpo para não gerar regra fantasma.
       workdays: form.scheduleType === "CUSTOM" ? form.workdays : null,
+      jobTitle: form.jobTitle?.trim() ? form.jobTitle.trim() : null,
       admissionDate: form.admissionDate || null,
       terminationDate: form.terminationDate || null
     }, editing?.id);
     setEditing(null);
-    setForm({ name: "", status: "ACTIVE", scheduleType: "MON_FRI", workdays: null, hasAccessCode: false, admissionDate: "", terminationDate: "" });
+    setForm({ name: "", status: "ACTIVE", scheduleType: "MON_FRI", workdays: null, jobTitle: null, hasAccessCode: false, admissionDate: "", terminationDate: "" });
   }
 
   // --- Códigos de acesso ao portal (RH) ---
@@ -173,6 +184,15 @@ export default function EmployeesPage({
               <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
             </Field>
             <Field>
+              <label>Função (opcional)</label>
+              <input
+                value={form.jobTitle ?? ""}
+                maxLength={60}
+                onChange={(event) => setForm({ ...form, jobTitle: event.target.value })}
+                placeholder="Ex.: Cozinheira"
+              />
+            </Field>
+            <Field>
               <label>Status</label>
               <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as EmployeeStatus })}>
                 <option value="ACTIVE">Ativo</option>
@@ -249,9 +269,11 @@ export default function EmployeesPage({
           <thead>
             <tr>
               <th>Nome</th>
+              <th>Função</th>
               <th>Jornada</th>
               <th>Status</th>
               <th>Acesso portal</th>
+              <th>Último acesso</th>
               {canEdit && <th>Ações</th>}
             </tr>
           </thead>
@@ -259,6 +281,7 @@ export default function EmployeesPage({
             {employees.map((employee) => (
               <tr key={employee.id}>
                 <td>{employee.name}</td>
+                <td>{employee.jobTitle?.trim() ? employee.jobTitle : "—"}</td>
                 <td>
                   {scheduleLabels[employee.scheduleType]}
                   {workdayLabel(employee.workdays) ? ` (${workdayLabel(employee.workdays)})` : ""}
@@ -281,6 +304,7 @@ export default function EmployeesPage({
                         : "Sem acesso"}
                   </Badge>
                 </td>
+                <td>{lastAccessLabel(employee.lastPortalAccessAt)}</td>
                 {canEdit && (
                   <td>
                     <InlineActions>

@@ -59,7 +59,7 @@ export function AccessCodeStep({
             onChange={(event) => setRemember(event.target.checked)}
             className="h-[18px] w-[18px] accent-teal-deep"
           />
-          Manter conectado neste aparelho (30 dias)
+          Manter conectado neste aparelho
         </label>
         <button
           type="button"

@@ -134,13 +134,13 @@ employeePortalRouter.post("/login", portalLoginLimiter, asyncHandler(async (req,
   });
 
   // Ativação: primeiro login com código marca o acesso como ativo.
+  // O último acesso é atualizado a cada login ok (isFirstAccess segue
+  // para a auditoria PORTAL_ACTIVATED vs PORTAL_LOGIN).
   const isFirstAccess = !employee.firstPortalAccessAt;
-  if (isFirstAccess) {
-    await prisma.employee.update({
-      where: { id: employee.id },
-      data: { firstPortalAccessAt: new Date() }
-    });
-  }
+  await prisma.employee.update({
+    where: { id: employee.id },
+    data: { firstPortalAccessAt: employee.firstPortalAccessAt ?? new Date(), lastPortalAccessAt: new Date() }
+  });
 
   await prisma.auditLog.create({
     data: {

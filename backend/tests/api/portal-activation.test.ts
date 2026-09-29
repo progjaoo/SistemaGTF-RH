@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../../src/server.js";
+import { prisma } from "../../src/lib/prisma.js";
 import { cleanup, createEmployee, createUser } from "../helpers.js";
 
 const TAG = "activation";
@@ -54,6 +55,34 @@ describe("portal activation", () => {
     const byId = Object.fromEntries(list.body.employees.map((e) => [e.id, e.portalAccess]));
     expect(byId[fresh.id]).toBe("none");
     expect(byId[employeeId]).toBe("active");
+  });
+
+  it("login atualiza lastPortalAccessAt e preserva firstPortalAccessAt", async () => {
+    const emp = await createEmployee(`${TAG}-lastaccess`);
+    ids.employeeIds.push(emp.id);
+    const gen = await request(app).put(`/api/employees/${emp.id}/access-code`)
+      .set("Authorization", `Bearer ${rhToken}`).send({});
+    expect(gen.status).toBe(200);
+
+    const before = new Date().toISOString();
+    const first = await request(app).post("/api/employee-portal/login")
+      .send({ employeeId: emp.id, code: gen.body.code });
+    expect(first.status).toBe(200);
+
+    const listAfterFirst = await request(app).get("/api/employees").set("Authorization", `Bearer ${rhToken}`);
+    const rowAfterFirst = listAfterFirst.body.employees.find((e) => e.id === emp.id);
+    expect(rowAfterFirst.lastPortalAccessAt).not.toBeNull();
+    expect(rowAfterFirst.lastPortalAccessAt >= before).toBe(true);
+    const firstRecord = await prisma.employee.findUnique({ where: { id: emp.id } });
+    expect(firstRecord?.firstPortalAccessAt).not.toBeNull();
+
+    const second = await request(app).post("/api/employee-portal/login")
+      .send({ employeeId: emp.id, code: gen.body.code });
+    expect(second.status).toBe(200);
+    const secondRecord = await prisma.employee.findUnique({ where: { id: emp.id } });
+    expect(secondRecord?.firstPortalAccessAt?.toISOString())
+      .toBe(firstRecord?.firstPortalAccessAt?.toISOString());
+    expect(secondRecord?.lastPortalAccessAt).not.toBeNull();
   });
 
   it("inativo não loga mesmo com código", async () => {

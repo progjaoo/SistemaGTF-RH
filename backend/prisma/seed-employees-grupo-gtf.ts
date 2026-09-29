@@ -23,8 +23,9 @@ const employeeNames = [
   "MARCOS",
   "FUMAÇA",
   "AYUME",
-  "LUCAS",
+  "LUCAS LINO",
   "BETE",
+  "JOÃO",
   "CLAITON",
   "PRISCILA",
   "REINALDO",
@@ -33,9 +34,9 @@ const employeeNames = [
   "LU ALVES",
   "VOGEL",
   "PR DÁRIO",
-  "BATALHA",
+  "LUCAS BATALHA",
   "ISAQUE",
-  "GERALDO",
+  "Pr. GERALDO",
   "SERGIO",
   "JOSIMAR",
   "ANTONIO",
@@ -43,7 +44,8 @@ const employeeNames = [
   "EVANDRO",
   "MANOEL",
   "SEBASTIÃO",
-  "CLAUDINEI"
+  "CLAUDINEI",
+  "RENATINHA"
 ] as const;
 
 async function main() {

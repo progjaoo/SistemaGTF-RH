@@ -20,10 +20,14 @@ export type Employee = {
   scheduleType: ScheduleType;
   // Dias esperados (0=dom..6=sáb). Null = segue o scheduleType.
   workdays: number[] | null;
+  // Função/cargo do colaborador. Null = não informado.
+  jobTitle: string | null;
   // True = colaborador tem código de acesso ao portal (hash nunca trafega).
   hasAccessCode: boolean;
   // none = sem código; pending = código gerado, nunca usado; active = já entrou.
   portalAccess: "none" | "pending" | "active";
+  // ISO do último login no portal. Null = nunca entrou.
+  lastPortalAccessAt: string | null;
   admissionDate: string | null;
   terminationDate: string | null;
 };
