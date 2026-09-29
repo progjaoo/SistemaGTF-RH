@@ -6,7 +6,7 @@ import { prisma } from "../lib/prisma.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { authenticate, requireRole, type AuthenticatedRequest } from "../middleware/auth.js";
 import { calculatePeriodSummary, serializePeriod } from "../services/calculations.js";
-import { buildXlsxBuffer } from "../services/report-files.js";
+import { buildReportHtml, buildXlsxBuffer } from "../services/report-files.js";
 import { sanitizeReportFilename, buildPeriodPdf } from "../services/report-pdf.js";
 
 export const billingPeriodsRouter = express.Router();
@@ -222,6 +222,12 @@ billingPeriodsRouter.get("/:id/report", asyncHandler(async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${sanitizeReportFilename(summary.period.label)}.pdf"`);
     return res.send(buffer);
+  }
+
+  if (req.query.format === "html") {
+    const html = buildReportHtml(summary);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.send(html);
   }
 
   if (req.query.format !== "xlsx") {

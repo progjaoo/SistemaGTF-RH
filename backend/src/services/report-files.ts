@@ -35,3 +35,57 @@ export async function buildXlsxBuffer(summary: PeriodSummary): Promise<Buffer> {
 
   return Buffer.from(buffer);
 }
+
+function escapeHtml(value: string | number): string {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Prévia do relatório para conferência em nova aba do navegador —
+// MESMOS dados do JSON/XLSX/PDF (regra PEGUEI-only), com botão Imprimir.
+export function buildReportHtml(summary: PeriodSummary): string {
+  const brl = (value: number) => `R$ ${value.toFixed(2).replace(".", ",")}`;
+  const rows = summary.employeeTotals.map((item) => `
+      <tr>
+        <td>${escapeHtml(item.employeeName)}</td>
+        <td class="num">${item.quantity}</td>
+        <td class="num">${item.notTaken}</td>
+        <td class="num">${item.pending}</td>
+        <td>${escapeHtml(item.unitPrices.map((price) => brl(price)).join(", "))}</td>
+        <td class="num">${brl(item.amount)}</td>
+      </tr>`).join("");
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatório — ${escapeHtml(summary.period.label)}</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:24px;color:#111827}
+h1{font-size:20px;margin:0 0 4px}
+p.meta{color:#6b7280;font-size:13px;margin:0 0 16px}
+table{border-collapse:collapse;width:100%}
+th,td{border:1px solid #d9e0e6;padding:8px 10px;text-align:left;font-size:14px}
+th{background:#f3f4f6}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.total{font-weight:bold;background:#f3f4f6}
+button{margin-bottom:16px;padding:8px 16px;font-size:14px;cursor:pointer}
+@media print{button{display:none}}
+</style>
+</head>
+<body>
+<button type="button" onclick="window.print()">Imprimir</button>
+<h1>Relatório — ${escapeHtml(summary.period.label)}</h1>
+<p class="meta">Período: ${escapeHtml(summary.period.startDate)} a ${escapeHtml(summary.period.endDate)} • Status: ${escapeHtml(summary.period.status)}</p>
+<table>
+<thead><tr><th>Funcionário</th><th>Pegou</th><th>Não pegou</th><th>Pendente</th><th>Preço(s)</th><th>Valor</th></tr></thead>
+<tbody>${rows}
+<tr class="total"><td>Total geral</td><td class="num">${summary.totalQuantity}</td><td class="num"></td><td class="num"></td><td></td><td class="num">${brl(summary.totalAmount)}</td></tr>
+</tbody>
+</table>
+</body>
+</html>`;
+}

@@ -248,5 +248,31 @@ export const api = {
     anchor.download = `relatorio_${range.start.replace(/-/g, "")}_a_${range.end.replace(/-/g, "")}.${range.format}`;
     anchor.click();
     URL.revokeObjectURL(url);
+  },
+  // Prévia em nova aba: abre a janela de forma síncrona no clique (evita
+  // bloqueio de popup) e injeta o HTML buscado com o token.
+  async openReportPreview(token: string, path: string) {
+    const popup = window.open("about:blank", "_blank");
+    if (!popup) throw new Error("Permita popups para abrir a prévia.");
+    try {
+      const response = await fetch(`${API_BASE}${path}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Não foi possível gerar a prévia.");
+      const html = await response.text();
+      popup.document.open();
+      popup.document.write(html);
+      popup.document.close();
+    } catch (error) {
+      popup.close();
+      throw error;
+    }
+  },
+  openPeriodPreview(token: string, periodId: string) {
+    return api.openReportPreview(token, `/billing-periods/${periodId}/report?format=html`);
+  },
+  openRangePreview(token: string, range: { start: string; end: string }) {
+    const params = new URLSearchParams({ start: range.start, end: range.end, format: "html" });
+    return api.openReportPreview(token, `/reports?${params.toString()}`);
   }
 };

@@ -714,11 +714,11 @@ export const openApiDocument = {
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
-          { name: "format", in: "query", schema: { type: "string", enum: ["xlsx", "pdf"] } }
+          { name: "format", in: "query", schema: { type: "string", enum: ["xlsx", "pdf", "html"] } }
         ],
         responses: {
           "200": {
-            description: "Relatório em JSON ou arquivo XLSX/PDF"
+            description: "Relatório em JSON ou arquivo XLSX/PDF/HTML"
           }
         }
       }
@@ -732,11 +732,11 @@ export const openApiDocument = {
         parameters: [
           { name: "start", in: "query", required: true, schema: { type: "string", format: "date", example: "2021-08-30" } },
           { name: "end", in: "query", required: true, schema: { type: "string", format: "date", example: "2021-09-02" } },
-          { name: "format", in: "query", schema: { type: "string", enum: ["json", "xlsx", "pdf"], default: "json" } }
+          { name: "format", in: "query", schema: { type: "string", enum: ["json", "xlsx", "pdf", "html"], default: "json" } }
         ],
         responses: {
           "200": {
-            description: "Relatório em JSON ou arquivo XLSX/PDF"
+            description: "Relatório em JSON ou arquivo XLSX/PDF/HTML"
           },
           "422": { description: "start > end ou intervalo acima de 366 dias" }
         }

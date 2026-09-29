@@ -4,7 +4,7 @@ import { parseDate } from "../lib/dates.js";
 import { asyncHandler } from "../middleware/async-handler.js";
 import { authenticate } from "../middleware/auth.js";
 import { calculateRangeSummary } from "../services/calculations.js";
-import { buildXlsxBuffer } from "../services/report-files.js";
+import { buildReportHtml, buildXlsxBuffer } from "../services/report-files.js";
 import { buildPeriodPdf } from "../services/report-pdf.js";
 
 export const reportsRouter = express.Router();
@@ -21,7 +21,7 @@ reportsRouter.get("/", asyncHandler(async (req, res) => {
   const input = z.object({
     start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    format: z.enum(["json", "xlsx", "pdf"]).optional().default("json")
+    format: z.enum(["json", "xlsx", "pdf", "html"]).optional().default("json")
   }).parse(req.query);
 
   const start = parseDate(input.start);
@@ -43,6 +43,11 @@ reportsRouter.get("/", asyncHandler(async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="relatorio_${slug}.pdf"`);
     return res.send(buffer);
+  }
+
+  if (input.format === "html") {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.send(buildReportHtml(summary));
   }
 
   if (input.format === "xlsx") {

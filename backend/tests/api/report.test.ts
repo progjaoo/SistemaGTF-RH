@@ -64,4 +64,13 @@ describe("billing-periods/:id/report", () => {
     expect(res.headers["content-type"]).toContain("application/pdf");
     expect((res.body as Buffer).subarray(0, 4).toString()).toBe("%PDF");
   });
+
+  it("HTML traz prévia com os mesmos totais", async () => {
+    const res = await request(app).get(`/api/billing-periods/${periodId}/report?format=html`)
+      .set("Authorization", `Bearer ${rhToken}`);
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/html");
+    expect(res.text).toContain("<table>");
+    expect(res.text).toContain("Total geral");
+  });
 });

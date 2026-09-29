@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Download, Eye, FileSpreadsheet, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api } from "../../api";
@@ -24,7 +24,7 @@ export default function ReportsPage({
   const [importPeriodId, setImportPeriodId] = useState(defaultPeriodId);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
-  const [busy, setBusy] = useState<"period-xlsx" | "period-pdf" | "range-xlsx" | "range-pdf" | null>(null);
+  const [busy, setBusy] = useState<"period-xlsx" | "period-pdf" | "period-preview" | "range-xlsx" | "range-pdf" | "range-preview" | null>(null);
 
   const selectedPeriod = periods.find((period) => period.id === (periodId || defaultPeriodId));
   const importPeriod = periods.find((period) => period.id === (importPeriodId || defaultPeriodId));
@@ -46,6 +46,21 @@ export default function ReportsPage({
     }
   }
 
+  async function previewPeriod() {
+    if (!selectedPeriod) {
+      toast.error("Selecione um período.");
+      return;
+    }
+    setBusy("period-preview");
+    try {
+      await api.openPeriodPreview(token, selectedPeriod.id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível abrir a prévia.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function downloadRange(format: "xlsx" | "pdf") {
     if (!rangeValid) return;
     setBusy(format === "xlsx" ? "range-xlsx" : "range-pdf");
@@ -54,6 +69,18 @@ export default function ReportsPage({
       toast.success("Relatório do intervalo gerado.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível gerar o relatório.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function previewRange() {
+    if (!rangeValid) return;
+    setBusy("range-preview");
+    try {
+      await api.openRangePreview(token, { start, end });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível abrir a prévia.");
     } finally {
       setBusy(null);
     }
@@ -84,6 +111,10 @@ export default function ReportsPage({
             </select>
           </Field>
           <div className="flex flex-wrap gap-2 max-[520px]:[&>button]:flex-[1_1_140px]">
+            <Button type="button" variant="outline" onClick={() => void previewPeriod()} disabled={!selectedPeriod || busy !== null}>
+              <Eye size={17} />
+              {busy === "period-preview" ? "Abrindo..." : "Prévia"}
+            </Button>
             <Button type="button" variant="outline" onClick={() => void downloadPeriod("xlsx")} disabled={!selectedPeriod || busy !== null}>
               <Download size={17} />
               {busy === "period-xlsx" ? "Gerando..." : "Planilha"}
@@ -114,6 +145,10 @@ export default function ReportsPage({
           </Field>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 max-[520px]:[&>button]:flex-[1_1_140px]">
+          <Button type="button" variant="outline" onClick={() => void previewRange()} disabled={!rangeValid || busy !== null}>
+            <Eye size={17} />
+            {busy === "range-preview" ? "Abrindo..." : "Prévia"}
+          </Button>
           <Button type="button" variant="outline" onClick={() => void downloadRange("xlsx")} disabled={!rangeValid || busy !== null}>
             <Download size={17} />
             {busy === "range-xlsx" ? "Gerando..." : "Planilha"}

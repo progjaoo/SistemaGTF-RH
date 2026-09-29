@@ -77,6 +77,15 @@ describe("reports por intervalo", () => {
     expect((res.body as Buffer).subarray(0, 4).toString()).toBe("%PDF");
   });
 
+  it("HTML traz prévia do intervalo", async () => {
+    const res = await request(app).get(rangeUrl("?start=2021-08-30&end=2021-09-02&format=html"))
+      .set("Authorization", `Bearer ${rhToken}`);
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/html");
+    expect(res.text).toContain("30/08/2021 a 02/09/2021");
+    expect(res.text).toContain("Total geral");
+  });
+
   it("start > end dá 422", async () => {
     const res = await request(app).get(rangeUrl("?start=2021-09-02&end=2021-08-30"))
       .set("Authorization", `Bearer ${rhToken}`);
