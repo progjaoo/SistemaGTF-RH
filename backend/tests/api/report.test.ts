@@ -85,6 +85,15 @@ describe("billing-periods/:id/report", () => {
     expect((res.body as Buffer).length).toBeGreaterThan(1024);
   });
 
+  it("JSON traz datas de pegou/não pegou por funcionário", async () => {
+    const res = await request(app).get(`/api/billing-periods/${periodId}/report`)
+      .set("Authorization", `Bearer ${rhToken}`);
+    expect(res.status).toBe(200);
+    const row = res.body.report.employeeTotals[0];
+    expect(row.takenDates).toEqual(["2020-09-02"]);
+    expect(row.notTakenDates).toEqual([]);
+  });
+
   it("XLSX PLAN-012 Task 2: 3 abas da gestora com fórmulas SUM reais (ExcelJS)", async () => {
     const res = await request(app).get(`/api/billing-periods/${periodId}/report?format=xlsx`)
       .set("Authorization", `Bearer ${rhToken}`).buffer(true)
@@ -102,6 +111,12 @@ describe("billing-periods/:id/report", () => {
     const folha = workbook.getWorksheet("Fechamento Folha")!;
     expect(String(folha.getCell("A1").value)).toContain("GTF");
     expect(sumFormulasIn(folha).length).toBeGreaterThanOrEqual(2);
+    // Colunas mensais RH: Funcionário | Dias | Preço Unitário | Quantidade | Não Pegou | Total.
+    const headerRow = folha.getRow(4).values as unknown[];
+    expect(String(headerRow[1])).toBe("Funcionário");
+    expect(String(headerRow[2])).toBe("Dias");
+    expect(String(headerRow[6])).toContain("Total");
+    expect(String(folha.getCell("B5").value)).toContain("02/09");
     const grade = workbook.getWorksheet("Grade Diária")!;
     expect(String(grade.getCell("A1").value)).toContain("GTF");
     expect(sumFormulasIn(grade).length).toBeGreaterThanOrEqual(1);

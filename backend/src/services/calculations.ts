@@ -111,6 +111,8 @@ function buildSummaryBody(records: RecordWithEmployee[], prices: MealPrice[], ra
     taken: number;
     notTaken: number;
     pending: number;
+    takenDates: string[];
+    notTakenDates: string[];
   }>();
   const dailyMap = new Map<string, { date: string; quantity: number; amount: number }>();
 
@@ -137,14 +139,20 @@ function buildSummaryBody(records: RecordWithEmployee[], prices: MealPrice[], ra
       unitPrices: new Set<number>(),
       taken: 0,
       notTaken: 0,
-      pending: 0
+      pending: 0,
+      takenDates: [],
+      notTakenDates: []
     };
     employeeTotal.quantity += quantity;
     employeeTotal.amount += amount;
     employeeTotal.unitPrices.add(unitPrice);
-    if (record.confirmationStatus === "PEGUEI") employeeTotal.taken += 1;
-    else if (record.confirmationStatus === "NAO_PEGUEI") employeeTotal.notTaken += 1;
-    else employeeTotal.pending += 1;
+    if (record.confirmationStatus === "PEGUEI") {
+      employeeTotal.taken += 1;
+      employeeTotal.takenDates.push(dateKey);
+    } else if (record.confirmationStatus === "NAO_PEGUEI") {
+      employeeTotal.notTaken += 1;
+      employeeTotal.notTakenDates.push(dateKey);
+    } else employeeTotal.pending += 1;
     employeeMap.set(record.employeeId, employeeTotal);
 
     const dailyTotal = dailyMap.get(dateKey) ?? { date: dateKey, quantity: 0, amount: 0 };
@@ -165,7 +173,9 @@ function buildSummaryBody(records: RecordWithEmployee[], prices: MealPrice[], ra
         unitPrices: [...item.unitPrices].sort((a, b) => a - b),
         taken: item.taken,
         notTaken: item.notTaken,
-        pending: item.pending
+        pending: item.pending,
+        takenDates: [...item.takenDates].sort(),
+        notTakenDates: [...item.notTakenDates].sort()
       }))
       .sort((a, b) => b.quantity - a.quantity || a.employeeName.localeCompare(b.employeeName)),
     dailyTrend: [...dailyMap.values()].map((item) => ({

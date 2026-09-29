@@ -6,32 +6,40 @@ import type { EmployeeTotal } from "../../types";
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value ?? 0);
 
-type SortKey = "name" | "taken" | "notTaken" | "pending" | "unitPrice" | "amount";
-type Filter = "all" | "consumed" | "pending";
+type SortKey = "name" | "days" | "unitPrice" | "quantity" | "notTaken" | "amount";
+type Filter = "all" | "consumed";
 
 const SORT_LABEL: Record<SortKey, string> = {
   name: "Funcionário",
-  taken: "Almoços (pegou)",
-  notTaken: "Não pegou",
-  pending: "Pendentes",
+  days: "Dias",
   unitPrice: "Preço unitário",
+  quantity: "Quantidade",
+  notTaken: "Não pegou",
   amount: "Total a descontar"
 };
 
 function unitPriceOf(row: EmployeeTotal): number {
-  return row.unitPrices[0] ?? 0;
+  if (row.unitPrices.length === 1) return row.unitPrices[0] ?? 0;
+  return row.quantity > 0 ? Math.round((row.amount / row.quantity) * 100) / 100 : (row.unitPrices[0] ?? 0);
+}
+
+function daysList(dates: string[]): string {
+  return dates.map((iso) => {
+    const [, month, day] = iso.split("-");
+    return month && day ? `${day}/${month}` : iso;
+  }).join(", ");
 }
 
 function valueOf(row: EmployeeTotal, key: SortKey): number | string {
   switch (key) {
     case "name":
       return row.employeeName.toLowerCase();
-    case "taken":
-      return row.taken;
+    case "days":
+      return daysList(row.takenDates);
+    case "quantity":
+      return row.quantity;
     case "notTaken":
       return row.notTaken;
-    case "pending":
-      return row.pending;
     case "unitPrice":
       return unitPriceOf(row);
     case "amount":
@@ -58,7 +66,6 @@ export default function ReportFinancialTable({ rows }: { rows: EmployeeTotal[] }
     const term = search.trim().toLowerCase();
     const filtered = rows.filter((row) => {
       if (filter === "consumed" && row.quantity <= 0) return false;
-      if (filter === "pending" && row.pending <= 0) return false;
       if (term !== "" && !row.employeeName.toLowerCase().includes(term)) return false;
       return true;
     });
@@ -74,23 +81,21 @@ export default function ReportFinancialTable({ rows }: { rows: EmployeeTotal[] }
     () =>
       visible.reduce(
         (acc, row) => ({
-          taken: acc.taken + row.taken,
+          quantity: acc.quantity + row.quantity,
           notTaken: acc.notTaken + row.notTaken,
-          pending: acc.pending + row.pending,
           amount: acc.amount + row.amount
         }),
-        { taken: 0, notTaken: 0, pending: 0, amount: 0 }
+        { quantity: 0, notTaken: 0, amount: 0 }
       ),
     [visible]
   );
 
   const filters: Array<{ key: Filter; label: string }> = [
     { key: "all", label: "Todos" },
-    { key: "consumed", label: "Com consumo" },
-    { key: "pending", label: "Com pendências" }
+    { key: "consumed", label: "Com consumo" }
   ];
 
-  const columns: SortKey[] = ["name", "taken", "notTaken", "pending", "unitPrice", "amount"];
+  const columns: SortKey[] = ["name", "days", "unitPrice", "quantity", "notTaken", "amount"];
 
   return (
     <div className="grid gap-3">
@@ -152,12 +157,12 @@ export default function ReportFinancialTable({ rows }: { rows: EmployeeTotal[] }
               {visible.map((row) => (
                 <tr key={row.employeeId}>
                   <td className="font-bold whitespace-nowrap">{row.employeeName}</td>
-                  <td className="tabular-nums">{row.taken}</td>
-                  <td className="tabular-nums">{row.notTaken}</td>
-                  <td className="tabular-nums">{row.pending}</td>
+                  <td>{daysList(row.takenDates) || "—"}</td>
                   <td className="tabular-nums whitespace-nowrap" title={row.unitPrices.map((p) => formatCurrency(p)).join(" · ")}>
                     {formatCurrency(unitPriceOf(row))}
                   </td>
+                  <td className="tabular-nums">{row.quantity}</td>
+                  <td>{daysList(row.notTakenDates) || "—"}</td>
                   <td className="tabular-nums whitespace-nowrap font-bold text-teal-deep">{formatCurrency(row.amount)}</td>
                 </tr>
               ))}
@@ -165,9 +170,9 @@ export default function ReportFinancialTable({ rows }: { rows: EmployeeTotal[] }
             <tfoot>
               <tr className="bg-teal-bg/60 font-bold">
                 <td>Total ({visible.length} {visible.length === 1 ? "colaborador" : "colaboradores"})</td>
-                <td className="tabular-nums">{totals.taken}</td>
-                <td className="tabular-nums">{totals.notTaken}</td>
-                <td className="tabular-nums">{totals.pending}</td>
+                <td aria-hidden>—</td>
+                <td aria-hidden>—</td>
+                <td className="tabular-nums">{totals.quantity}</td>
                 <td aria-hidden>—</td>
                 <td className="tabular-nums whitespace-nowrap text-teal-deep">{formatCurrency(totals.amount)}</td>
               </tr>

@@ -51,41 +51,54 @@ export function buildPeriodPdf(summary: PeriodSummary): Promise<Buffer> {
     );
     doc.moveDown();
 
-    // Colunas: nome | pegou | não pegou | pendente | preços | valor (largura útil A4 ≈ 500pt).
-    const x = { name: 48, qty: 238, notTaken: 288, pending: 348, prices: 408, amount: 478 };
-    const row = (name: string, qty: string, notTaken: string, pending: string, prices: string, amount: string, bold: boolean, fill?: string) => {
+    // Colunas mensais RH: nome | dias (pegou) | preço unit. (médio) |
+    // qtd | não pegou | total (largura útil A4 ≈ 500pt).
+    const x = { name: 48, days: 184, unit: 320, qty: 384, notTaken: 422, amount: 487 };
+    const row = (name: string, days: string, unit: string, qty: string, notTaken: string, amount: string, bold: boolean, fill?: string) => {
       if (doc.y > 730) doc.addPage();
-      if (fill) {
-        const h = Math.max(doc.heightOfString(name, { width: 180 }), 12) + 8;
-        doc.rect(PAGE_LEFT, doc.y - 4, CONTENT_WIDTH, h).fill(fill);
-      }
+      const h = Math.max(
+        doc.heightOfString(name, { width: 132 }),
+        doc.heightOfString(days, { width: 128 }),
+        12
+      ) + 8;
+      if (fill) doc.rect(PAGE_LEFT, doc.y - 4, CONTENT_WIDTH, h).fill(fill);
       doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(10).fillColor(INK);
-      doc.text(name, x.name, doc.y, { width: 180 });
+      doc.text(name, x.name, doc.y, { width: 132 });
       const y = doc.y - 12;
-      doc.text(qty, x.qty, y, { width: 42, align: "right" });
-      doc.text(notTaken, x.notTaken, y, { width: 52, align: "right" });
-      doc.text(pending, x.pending, y, { width: 52, align: "right" });
-      doc.text(prices, x.prices, y, { width: 62 });
-      doc.text(amount, x.amount, y, { width: 69, align: "right" });
+      doc.text(days, x.days, y, { width: 128 });
+      doc.text(unit, x.unit, y, { width: 56, align: "right" });
+      doc.text(qty, x.qty, y, { width: 34, align: "right" });
+      doc.text(notTaken, x.notTaken, y, { width: 56 });
+      doc.text(amount, x.amount, y, { width: 60, align: "right" });
       doc.moveDown(0.6);
       doc.moveTo(PAGE_LEFT, doc.y).lineTo(PAGE_RIGHT, doc.y).strokeColor(RULE).stroke();
       doc.moveDown(0.6);
     };
 
-    row("Funcionário", "Pegou", "Não pegou", "Pendente", "Preço(s)", "Valor", true, TEAL_PALE);
+    const daysList = (dates: string[]) => dates.map((iso) => {
+      const [, month, day] = iso.split("-");
+      return month && day ? `${day}/${month}` : iso;
+    }).join(", ");
+
+    row("Funcionário", "Dias", "Preço Unit.", "Qtd", "Não Pegou", "Total", true, TEAL_PALE);
     for (const item of employees) {
+      const unitDisplay = item.unitPrices.length === 1
+        ? item.unitPrices[0]!
+        : item.quantity > 0
+          ? Math.round((item.amount / item.quantity) * 100) / 100
+          : (item.unitPrices[0] ?? 0);
       row(
         item.employeeName,
+        daysList(item.takenDates),
+        brl(unitDisplay),
         String(item.quantity),
-        String(item.notTaken),
-        String(item.pending),
-        item.unitPrices.map((price) => brl(price)).join(", "),
+        daysList(item.notTakenDates),
         brl(item.amount),
         false
       );
     }
     doc.moveDown(0.5);
-    row("Total geral", String(summary.totalQuantity), "", "", "", brl(summary.totalAmount), true, TOTAL_FILL);
+    row("Total geral", "", "", String(summary.totalQuantity), "", brl(summary.totalAmount), true, TOTAL_FILL);
 
     doc.end();
   });

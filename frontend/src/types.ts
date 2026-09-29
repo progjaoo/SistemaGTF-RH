@@ -72,6 +72,8 @@ export type EmployeeTotal = {
   taken: number;
   notTaken: number;
   pending: number;
+  takenDates: string[];
+  notTakenDates: string[];
 };
 
 export type DailyMatrixCell = {

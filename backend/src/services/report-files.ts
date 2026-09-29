@@ -46,15 +46,16 @@ function buildFechamentoFolha(workbook: ExcelJS.Workbook, summary: PeriodSummary
     11
   );
 
-  // Tabela de descontos: cabeçalho na linha 4, dados a partir da linha 5.
+  // Tabela mensal RH: Funcionário | Dias (pegou) | Preço unitário (médio) |
+  // Quantidade | Não pegou | Total — cabeçalho na linha 4, dados da linha 5.
   const HEADER_ROW = 4;
   const DATA_START = 5;
   const headers = [
     "Funcionário",
-    "Almoços Faturados",
-    "Dias Não Pegou",
-    "Dias Pendentes",
+    "Dias",
     "Preço Unitário",
+    "Quantidade",
+    "Não Pegou",
     "Total a Descontar (R$)"
   ];
   headers.forEach((header, index) => {
@@ -69,7 +70,7 @@ function buildFechamentoFolha(workbook: ExcelJS.Workbook, summary: PeriodSummary
 
   employees.forEach((item, index) => {
     const row = DATA_START + index;
-    // E: preço unitário numérico com formato BRL. Com mais de um preço
+    // C: preço unitário numérico com formato BRL. Com mais de um preço
     // aplicado no período, usa a média ponderada (amount/quantity) para
     // manter a coluna numérica; F carrega o valor exato do resumo.
     const unitDisplay = item.unitPrices.length === 1
@@ -78,10 +79,10 @@ function buildFechamentoFolha(workbook: ExcelJS.Workbook, summary: PeriodSummary
         ? roundCurrency(item.amount / item.quantity)
         : (item.unitPrices[0] ?? 0);
     setCell(sheet, row, 1, item.employeeName, { horizontal: "left" });
-    setCell(sheet, row, 2, item.quantity, { horizontal: "right" });
-    setCell(sheet, row, 3, item.notTaken, { horizontal: "right" });
-    setCell(sheet, row, 4, item.pending, { horizontal: "right" });
-    setCell(sheet, row, 5, unitDisplay, { horizontal: "right", numFmt: BRL_FMT });
+    setCell(sheet, row, 2, daysList(item.takenDates), { horizontal: "left" });
+    setCell(sheet, row, 3, unitDisplay, { horizontal: "right", numFmt: BRL_FMT });
+    setCell(sheet, row, 4, item.quantity, { horizontal: "right" });
+    setCell(sheet, row, 5, daysList(item.notTakenDates), { horizontal: "left" });
     setCell(sheet, row, 6, item.amount, { horizontal: "right", numFmt: BRL_FMT });
   });
 
@@ -90,7 +91,7 @@ function buildFechamentoFolha(workbook: ExcelJS.Workbook, summary: PeriodSummary
   const hasData = employees.length > 0;
   const dataEnd = totalRow - 1;
   setCell(sheet, totalRow, 1, "TOTAL GERAL", { bold: true });
-  for (const col of [2, 3, 4, 6]) {
+  for (const col of [4, 6]) {
     if (hasData) {
       const cell = sheet.getCell(totalRow, col);
       cell.value = { formula: `SUM(${colLetter(col)}${DATA_START}:${colLetter(col)}${dataEnd})` };
@@ -106,11 +107,11 @@ function buildFechamentoFolha(workbook: ExcelJS.Workbook, summary: PeriodSummary
   setCell(sheet, totalRow, 5, "", { bold: true });
   sheet.getCell(totalRow, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
 
-  sheet.getColumn(1).width = 34;
-  sheet.getColumn(2).width = 18;
+  sheet.getColumn(1).width = 30;
+  sheet.getColumn(2).width = 30;
   sheet.getColumn(3).width = 16;
-  sheet.getColumn(4).width = 16;
-  sheet.getColumn(5).width = 16;
+  sheet.getColumn(4).width = 14;
+  sheet.getColumn(5).width = 30;
   sheet.getColumn(6).width = 22;
   sheet.views = [{ state: "frozen", ySplit: HEADER_ROW }];
 }
@@ -345,7 +346,13 @@ function fullWeekdayLabel(shortLabel: string, weekend: boolean): string {
   return weekend ? full.toUpperCase() : full;
 }
 
-// "YYYY-MM-DD" -> "DD/MM/YYYY" (texto, sem serial de data do Excel).
+// Lista de datas "YYYY-MM-DD" -> "DD/MM, DD/MM".
+function daysList(dates: string[]): string {
+  return dates.map((iso) => {
+    const [, month, day] = iso.split("-");
+    return month && day ? `${day}/${month}` : iso;
+  }).join(", ");
+}
 function brDate(iso: string): string {
   const [year, month, day] = iso.split("-");
   if (!year || !month || !day) return iso;
@@ -373,15 +380,22 @@ function escapeHtml(value: string | number): string {
 // Prévia do relatório para conferência em nova aba do navegador —
 // MESMOS dados do JSON/XLSX/PDF (regra PEGUEI-only), com botão Imprimir.
 export function buildReportHtml(summary: PeriodSummary): string {
-  const rows = summary.employeeTotals.map((item) => `
+  const rows = summary.employeeTotals.map((item) => {
+    const unitDisplay = item.unitPrices.length === 1
+      ? item.unitPrices[0]!
+      : item.quantity > 0
+        ? roundCurrency(item.amount / item.quantity)
+        : (item.unitPrices[0] ?? 0);
+    return `
       <tr>
         <td>${escapeHtml(item.employeeName)}</td>
+        <td>${escapeHtml(daysList(item.takenDates))}</td>
+        <td class="num">${brl(unitDisplay)}</td>
         <td class="num">${item.quantity}</td>
-        <td class="num">${item.notTaken}</td>
-        <td class="num">${item.pending}</td>
-        <td>${escapeHtml(item.unitPrices.map((price) => brl(price)).join(", "))}</td>
+        <td>${escapeHtml(daysList(item.notTakenDates))}</td>
         <td class="num">${brl(item.amount)}</td>
-      </tr>`).join("");
+      </tr>`;
+  }).join("");
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -406,7 +420,7 @@ button{margin-bottom:16px;padding:8px 16px;font-size:14px;cursor:pointer}
 <h1>Relatório — ${escapeHtml(summary.period.label)}</h1>
 <p class="meta">Período: ${escapeHtml(summary.period.startDate)} a ${escapeHtml(summary.period.endDate)} • Status: ${escapeHtml(summary.period.status)}</p>
 <table>
-<thead><tr><th>Funcionário</th><th>Pegou</th><th>Não pegou</th><th>Pendente</th><th>Preço(s)</th><th>Valor</th></tr></thead>
+<thead><tr><th>Funcionário</th><th>Dias</th><th>Preço Unitário</th><th>Quantidade</th><th>Não Pegou</th><th>Total</th></tr></thead>
 <tbody>${rows}
 <tr class="total"><td>Total geral</td><td class="num">${summary.totalQuantity}</td><td class="num"></td><td class="num"></td><td></td><td class="num">${brl(summary.totalAmount)}</td></tr>
 </tbody>
