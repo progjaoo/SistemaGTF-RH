@@ -1,5 +1,5 @@
-import { FormEvent, useState } from "react";
-import { KeyRound, Save } from "lucide-react";
+import { FormEvent, useMemo, useState } from "react";
+import { Ban, KeyRound, Pencil, Plus, Save, Search, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api";
 import { Badge } from "@/components/ui/badge";
@@ -13,9 +13,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DataTable, Field, FormGrid, InlineActions, Panel, PanelHeader, TwoColumn } from "../../components/ui";
+import { DataTable, Field, Panel, PanelHeader } from "../../components/ui";
 import { cn } from "@/lib/utils";
 import type { Employee, EmployeeStatus, ScheduleType } from "../../types";
+import { initials } from "../../utils/format";
 import { scheduleLabels, statusLabels, workdayLabel } from "../../utils/labels";
 
 function lastAccessLabel(iso: string | null): string {
@@ -24,6 +25,14 @@ function lastAccessLabel(iso: string | null): string {
   if (days <= 0) return "Hoje";
   if (days === 1) return "Há 1 dia";
   return `Há ${days} dias`;
+}
+
+function accessBadgeVariant(access: Employee["portalAccess"]) {
+  return access === "active" ? "good" : access === "pending" ? "warn" : "muted";
+}
+
+function accessLabel(access: Employee["portalAccess"]) {
+  return access === "active" ? "Ativo" : access === "pending" ? "Pendente" : "Sem acesso";
 }
 
 const WEEKDAYS = [
@@ -35,6 +44,17 @@ const WEEKDAYS = [
   { value: 6, label: "Sáb" },
   { value: 0, label: "Dom" }
 ];
+
+const EMPTY_FORM = {
+  name: "",
+  status: "ACTIVE",
+  scheduleType: "MON_FRI",
+  workdays: null,
+  jobTitle: null,
+  hasAccessCode: false,
+  admissionDate: "",
+  terminationDate: ""
+} as const;
 
 export default function EmployeesPage({
   employees,
@@ -52,16 +72,29 @@ export default function EmployeesPage({
   onReload: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState<Employee | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<Omit<Employee, "id" | "portalAccess" | "lastPortalAccessAt">>({
-    name: "",
-    status: "ACTIVE",
-    scheduleType: "MON_FRI",
+    ...EMPTY_FORM,
     workdays: null,
-    jobTitle: null,
-    hasAccessCode: false,
-    admissionDate: "",
-    terminationDate: ""
+    jobTitle: null
   });
+  const [query, setQuery] = useState("");
+
+  const activeCount = useMemo(() => employees.filter((e) => e.status === "ACTIVE").length, [employees]);
+  const visibleEmployees = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q
+      ? employees.filter(
+          (e) =>
+            e.name.toLowerCase().includes(q) ||
+            (e.jobTitle ?? "").toLowerCase().includes(q)
+        )
+      : employees;
+    return [...list].sort((a, b) => {
+      if (a.status !== b.status) return a.status === "ACTIVE" ? -1 : 1;
+      return a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" });
+    });
+  }, [employees, query]);
 
   function toggleWorkday(day: number) {
     setForm((current) => {
@@ -71,6 +104,12 @@ export default function EmployeesPage({
       const sorted = [...selected].sort((a, b) => a - b);
       return { ...current, workdays: sorted.length > 0 ? sorted : null };
     });
+  }
+
+  function openNew() {
+    setEditing(null);
+    setForm({ ...EMPTY_FORM, workdays: null, jobTitle: null });
+    setFormOpen(true);
   }
 
   function startEdit(employee: Employee) {
@@ -85,6 +124,7 @@ export default function EmployeesPage({
       admissionDate: employee.admissionDate ?? "",
       terminationDate: employee.terminationDate ?? ""
     });
+    setFormOpen(true);
   }
 
   async function submit(event: FormEvent) {
@@ -102,7 +142,8 @@ export default function EmployeesPage({
       terminationDate: form.terminationDate || null
     }, editing?.id);
     setEditing(null);
-    setForm({ name: "", status: "ACTIVE", scheduleType: "MON_FRI", workdays: null, jobTitle: null, hasAccessCode: false, admissionDate: "", terminationDate: "" });
+    setFormOpen(false);
+    setForm({ ...EMPTY_FORM, workdays: null, jobTitle: null });
   }
 
   // --- Códigos de acesso ao portal (RH) ---
@@ -172,161 +213,109 @@ export default function EmployeesPage({
   }
 
   return (
-    <TwoColumn>
-      {canEdit && (
-        <Panel>
-          <PanelHeader>
-            <h2>{editing ? "Editar funcionário" : "Novo funcionário"}</h2>
-          </PanelHeader>
-          <FormGrid onSubmit={submit}>
-            <Field>
-              <label>Nome</label>
-              <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
-            </Field>
-            <Field>
-              <label>Função (opcional)</label>
-              <input
-                value={form.jobTitle ?? ""}
-                maxLength={60}
-                onChange={(event) => setForm({ ...form, jobTitle: event.target.value })}
-                placeholder="Ex.: Cozinheira"
-              />
-            </Field>
-            <Field>
-              <label>Status</label>
-              <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as EmployeeStatus })}>
-                <option value="ACTIVE">Ativo</option>
-                <option value="INACTIVE">Inativo</option>
-              </select>
-            </Field>
-            <Field>
-              <label>Jornada</label>
-              <select value={form.scheduleType} onChange={(event) => setForm({ ...form, scheduleType: event.target.value as ScheduleType })}>
-                <option value="MON_FRI">Seg-Sex</option>
-                <option value="MON_SUN">Seg-Dom</option>
-                <option value="CUSTOM">Personalizada</option>
-              </select>
-            </Field>
-            {form.scheduleType === "CUSTOM" && (
-              <Field>
-                <label>Dias esperados</label>
-                <div className="flex flex-wrap gap-2">
-                  {WEEKDAYS.map((day) => {
-                    const active = form.workdays?.includes(day.value) ?? false;
-                    return (
-                      <label
-                        key={day.value}
-                        className={cn(
-                          "inline-flex min-h-11 cursor-pointer items-center gap-[6px] rounded-lg border px-3 py-2 font-extrabold text-ink",
-                          active ? "border-teal bg-teal-bg" : "border-line bg-surface"
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={active}
-                          onChange={() => toggleWorkday(day.value)}
-                          aria-label={`Esperado às ${day.label}s`}
-                          className="h-[18px] w-[18px] accent-teal-deep"
-                        />
-                        {day.label}
-                      </label>
-                    );
-                  })}
-                </div>
-              </Field>
-            )}
-            <Field>
-              <label>Admissão</label>
-              <input type="date" value={form.admissionDate ?? ""} onChange={(event) => setForm({ ...form, admissionDate: event.target.value })} />
-            </Field>
-            <Field>
-              <label>Desligamento</label>
-              <input type="date" value={form.terminationDate ?? ""} onChange={(event) => setForm({ ...form, terminationDate: event.target.value })} />
-            </Field>
-            <Button type="submit">
-              <Save size={17} />
-              Salvar
-            </Button>
-          </FormGrid>
-        </Panel>
-      )}
-
+    <>
       <Panel>
         <PanelHeader>
-          <h2>Funcionários</h2>
-        </PanelHeader>
-        {canEdit && (
-          <div className="mb-3 flex flex-wrap items-center gap-[10px] [&>span]:text-[0.86rem] [&>span]:font-bold [&>span]:text-muted">
-            <Button type="button" onClick={() => void generateBatch()} disabled={codeBusy === "batch"}>
-              <KeyRound size={17} />
-              {codeBusy === "batch" ? "Gerando..." : "Gerar códigos pendentes"}
-            </Button>
-            <span>Cria códigos para todos os ativos sem acesso. A lista aparece uma única vez.</span>
+          <div>
+            <h2>Funcionários</h2>
+            <p>{activeCount} ativos · {employees.length - activeCount} inativos</p>
           </div>
+          {canEdit && (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => void generateBatch()} disabled={codeBusy === "batch"}>
+                <KeyRound size={17} />
+                {codeBusy === "batch" ? "Gerando..." : "Gerar códigos"}
+              </Button>
+              <Button type="button" onClick={openNew}>
+                <Plus size={17} />
+                Novo funcionário
+              </Button>
+            </div>
+          )}
+        </PanelHeader>
+        <div className="relative mb-3">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar por nome ou função…"
+            aria-label="Buscar funcionário"
+            className="min-h-10 w-full rounded-lg border border-line bg-surface pl-9 pr-3 text-ink focus:border-teal focus:outline-none"
+          />
+        </div>
+        {canEdit && (
+          <p className="mb-3 text-[0.86rem] font-bold text-muted">
+            Códigos de acesso: gere por pessoa ou todos os pendentes de uma vez. A lista aparece uma única vez.
+          </p>
         )}
-        {codeError && <p className="rounded-lg border border-danger/30 bg-danger/5 p-[10px_12px] font-extrabold text-danger-ink">{codeError}</p>}
+        {codeError && <p className="mb-3 rounded-lg border border-danger/30 bg-danger/5 p-[10px_12px] font-extrabold text-danger-ink">{codeError}</p>}
         <DataTable>
           <thead>
             <tr>
-              <th>Nome</th>
-              <th>Função</th>
+              <th>Funcionário</th>
               <th>Jornada</th>
               <th>Status</th>
               <th>Acesso portal</th>
-              <th>Último acesso</th>
               {canEdit && <th>Ações</th>}
             </tr>
           </thead>
           <tbody>
-            {employees.map((employee) => (
-              <tr key={employee.id}>
-                <td>{employee.name}</td>
-                <td>{employee.jobTitle?.trim() ? employee.jobTitle : "—"}</td>
+            {visibleEmployees.length === 0 && (
+              <tr>
+                <td colSpan={canEdit ? 5 : 4} className="text-muted">
+                  Nenhum funcionário encontrado para o filtro informado.
+                </td>
+              </tr>
+            )}
+            {visibleEmployees.map((employee) => (
+              <tr key={employee.id} className={employee.status === "ACTIVE" ? "" : "opacity-70"}>
+                <td>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span
+                      aria-hidden="true"
+                      className="grid h-10 w-10 flex-none place-items-center rounded-full bg-teal-bg text-sm font-black text-teal-deep"
+                    >
+                      {initials(employee.name)}
+                    </span>
+                    <span className="min-w-0">
+                      <strong className="block truncate">{employee.name}</strong>
+                      <span className="block truncate text-[0.82rem] text-muted">
+                        {employee.jobTitle?.trim() ? employee.jobTitle : "Sem função definida"}
+                      </span>
+                    </span>
+                  </div>
+                </td>
                 <td>
                   {scheduleLabels[employee.scheduleType]}
                   {workdayLabel(employee.workdays) ? ` (${workdayLabel(employee.workdays)})` : ""}
                 </td>
                 <td><Badge variant={employee.status === "ACTIVE" ? "good" : "muted"}>{statusLabels[employee.status]}</Badge></td>
                 <td>
-                  <Badge
-                    variant={
-                      employee.portalAccess === "active"
-                        ? "good"
-                        : employee.portalAccess === "pending"
-                          ? "warn"
-                          : "muted"
-                    }
-                  >
-                    {employee.portalAccess === "active"
-                      ? "Ativo"
-                      : employee.portalAccess === "pending"
-                        ? "Pendente"
-                        : "Sem acesso"}
-                  </Badge>
+                  <span className="flex flex-col items-start gap-1">
+                    <Badge variant={accessBadgeVariant(employee.portalAccess)}>
+                      {accessLabel(employee.portalAccess)}
+                    </Badge>
+                    <span className="text-xs text-muted">{lastAccessLabel(employee.lastPortalAccessAt)}</span>
+                  </span>
                 </td>
-                <td>{lastAccessLabel(employee.lastPortalAccessAt)}</td>
                 {canEdit && (
                   <td>
-                    <InlineActions>
-                      <Button type="button" onClick={() => startEdit(employee)}>Editar</Button>
-                      <Button type="button" variant="outline" onClick={() => setInactivateTarget(employee)}>Inativar</Button>
-                      {employee.hasAccessCode ? (
-                        <>
-                          <Button type="button" variant="outline" onClick={() => void generateCode(employee)} disabled={codeBusy === employee.id}>
-                            <KeyRound size={16} />
-                            Reemitir
-                          </Button>
-                          <Button type="button" variant="outline" onClick={() => setRevokeTarget(employee)} disabled={codeBusy === employee.id}>
-                            Revogar
-                          </Button>
-                        </>
-                      ) : (
-                        <Button type="button" variant="outline" onClick={() => void generateCode(employee)} disabled={codeBusy === employee.id}>
-                          <KeyRound size={16} />
-                          Gerar código
+                    <div className="flex gap-1">
+                      <Button type="button" size="icon" title={`Editar ${employee.name}`} aria-label={`Editar ${employee.name}`} onClick={() => startEdit(employee)}>
+                        <Pencil size={16} />
+                      </Button>
+                      <Button type="button" size="icon" variant="outline" title={`Inativar ${employee.name}`} aria-label={`Inativar ${employee.name}`} onClick={() => setInactivateTarget(employee)}>
+                        <UserX size={16} />
+                      </Button>
+                      <Button type="button" size="icon" variant="outline" title={employee.hasAccessCode ? `Reemitir código de ${employee.name}` : `Gerar código de ${employee.name}`} aria-label={employee.hasAccessCode ? `Reemitir código de ${employee.name}` : `Gerar código de ${employee.name}`} onClick={() => void generateCode(employee)} disabled={codeBusy === employee.id}>
+                        <KeyRound size={16} />
+                      </Button>
+                      {employee.hasAccessCode && (
+                        <Button type="button" size="icon" variant="outline" title={`Revogar acesso de ${employee.name}`} aria-label={`Revogar acesso de ${employee.name}`} onClick={() => setRevokeTarget(employee)} disabled={codeBusy === employee.id}>
+                          <Ban size={16} />
                         </Button>
                       )}
-                    </InlineActions>
+                    </div>
                   </td>
                 )}
               </tr>
@@ -334,6 +323,99 @@ export default function EmployeesPage({
           </tbody>
         </DataTable>
       </Panel>
+
+      <Dialog open={formOpen} onOpenChange={(open) => { if (!open) { setFormOpen(false); setEditing(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing ? `Editar ${editing.name}` : "Novo funcionário"}</DialogTitle>
+            <DialogDescription>
+              {editing ? "Ajuste os dados cadastrais. O código de acesso não muda aqui." : "Cadastre nome, função e jornada. O código de acesso é gerado depois, na lista."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submit}>
+            <div className="grid gap-3">
+              <Field>
+                <label htmlFor="employee-name">Nome</label>
+                <input id="employee-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+              </Field>
+              <Field>
+                <label htmlFor="employee-job">Função (opcional)</label>
+                <input
+                  id="employee-job"
+                  value={form.jobTitle ?? ""}
+                  maxLength={60}
+                  onChange={(event) => setForm({ ...form, jobTitle: event.target.value })}
+                  placeholder="Ex.: Cozinheira"
+                />
+              </Field>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field>
+                  <label htmlFor="employee-status">Status</label>
+                  <select id="employee-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as EmployeeStatus })}>
+                    <option value="ACTIVE">Ativo</option>
+                    <option value="INACTIVE">Inativo</option>
+                  </select>
+                </Field>
+                <Field>
+                  <label htmlFor="employee-schedule">Jornada</label>
+                  <select id="employee-schedule" value={form.scheduleType} onChange={(event) => setForm({ ...form, scheduleType: event.target.value as ScheduleType })}>
+                    <option value="MON_FRI">Seg-Sex</option>
+                    <option value="MON_SUN">Seg-Dom</option>
+                    <option value="CUSTOM">Personalizada</option>
+                  </select>
+                </Field>
+              </div>
+              {form.scheduleType === "CUSTOM" && (
+                <Field>
+                  <label>Dias esperados</label>
+                  <div className="flex flex-wrap gap-2">
+                    {WEEKDAYS.map((day) => {
+                      const active = form.workdays?.includes(day.value) ?? false;
+                      return (
+                        <label
+                          key={day.value}
+                          className={cn(
+                            "inline-flex min-h-11 cursor-pointer items-center gap-[6px] rounded-lg border px-3 py-2 font-extrabold text-ink",
+                            active ? "border-teal bg-teal-bg" : "border-line bg-surface"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={active}
+                            onChange={() => toggleWorkday(day.value)}
+                            aria-label={`Esperado às ${day.label}s`}
+                            className="h-[18px] w-[18px] accent-teal-deep"
+                          />
+                          {day.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </Field>
+              )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field>
+                  <label htmlFor="employee-admission">Admissão</label>
+                  <input id="employee-admission" type="date" value={form.admissionDate ?? ""} onChange={(event) => setForm({ ...form, admissionDate: event.target.value })} />
+                </Field>
+                <Field>
+                  <label htmlFor="employee-termination">Desligamento</label>
+                  <input id="employee-termination" type="date" value={form.terminationDate ?? ""} onChange={(event) => setForm({ ...form, terminationDate: event.target.value })} />
+                </Field>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setFormOpen(false); setEditing(null); }}>
+                Cancelar
+              </Button>
+              <Button type="submit">
+                <Save size={17} />
+                Salvar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={singleCode !== null} onOpenChange={(open) => { if (!open) setSingleCode(null); }}>
         <DialogContent>
@@ -439,6 +521,6 @@ export default function EmployeesPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </TwoColumn>
+    </>
   );
 }
