@@ -7,4 +7,6 @@ dist/
 coverage/
 *.log
 .superpowers/
+agents/
+docs/
 backend/prisma/migrations/*/migration_lock.toml
