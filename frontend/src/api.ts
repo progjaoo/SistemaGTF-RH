@@ -10,6 +10,7 @@ import type {
   MealRecordConfirmation,
   ConfirmationStatus,
   ImportResult,
+  PeriodSummary,
   Role,
   Session,
   User
@@ -221,6 +222,16 @@ export const api = {
       method: id ? "PUT" : "POST",
       body: JSON.stringify(payload)
     });
+  },
+  // Resumo JSON instantâneo para a prévia inline (sem disparar download).
+  periodReportSummary(token: string, periodId: string): Promise<PeriodSummary> {
+    return request<{ report: PeriodSummary }>(`/billing-periods/${periodId}/report?format=json`, token).then(
+      ({ report }) => report
+    );
+  },
+  rangeReportSummary(token: string, range: { start: string; end: string }): Promise<PeriodSummary> {
+    const params = new URLSearchParams({ start: range.start, end: range.end, format: "json" });
+    return request<{ report: PeriodSummary }>(`/reports?${params.toString()}`, token).then(({ report }) => report);
   },
   async downloadReport(token: string, period: BillingPeriod, format: "xlsx" | "pdf" = "xlsx") {
     const response = await fetch(`${API_BASE}/billing-periods/${period.id}/report?format=${format}`, {

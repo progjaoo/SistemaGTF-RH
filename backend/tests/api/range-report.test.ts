@@ -59,6 +59,33 @@ describe("reports por intervalo", () => {
     expect(res.body.report.period.status).toBe("OPEN");
   });
 
+  it("JSON traz dailyMatrix contínua com distinção PEGUEI-only (PLAN-012 Task 1)", async () => {
+    const res = await request(app).get(rangeUrl("?start=2021-08-30&end=2021-09-02"))
+      .set("Authorization", `Bearer ${rhToken}`);
+    expect(res.status).toBe(200);
+    const matrix = res.body.report.dailyMatrix;
+    // Intervalo 2021-08-30 (seg) → 2021-09-02 (qui): calendário contínuo.
+    expect(matrix).toHaveLength(4);
+    expect(matrix.map((day: { date: string }) => day.date)).toEqual([
+      "2021-08-30", "2021-08-31", "2021-09-01", "2021-09-02"
+    ]);
+    expect(matrix.map((day: { weekdayLabel: string }) => day.weekdayLabel)).toEqual([
+      "Seg", "Ter", "Qua", "Qui"
+    ]);
+    expect(matrix.map((day: { dayOfWeek: number }) => day.dayOfWeek)).toEqual([1, 2, 3, 4]);
+    expect(matrix.every((day: { isWeekend: boolean }) => day.isWeekend === false)).toBe(true);
+    // Dia PEGUEI fatura; dia NAO_PEGUEI soma só no bruto (quantidade lançada).
+    expect(matrix[1]).toMatchObject({ totalQuantity: 1, totalRawQuantity: 1, amount: 10 });
+    expect(matrix[1].entries[employeeId]).toEqual({ quantity: 1, confirmationStatus: "PEGUEI" });
+    expect(matrix[3]).toMatchObject({ totalQuantity: 0, totalRawQuantity: 1, amount: 0 });
+    expect(matrix[3].entries[employeeId]).toEqual({ quantity: 1, confirmationStatus: "NAO_PEGUEI" });
+    // Dia sem lançamento: neutro.
+    expect(matrix[0]).toMatchObject({ totalQuantity: 0, totalRawQuantity: 0, amount: 0, entries: {} });
+    // Totais existentes inalterados.
+    expect(res.body.report.totalQuantity).toBe(2);
+    expect(res.body.report.totalAmount).toBe(20);
+  });
+
   it("XLSX tem content-type de planilha e filename do intervalo", async () => {
     const res = await request(app).get(rangeUrl("?start=2021-08-30&end=2021-09-02&format=xlsx"))
       .set("Authorization", `Bearer ${rhToken}`).buffer(true).parse(asBuffer);

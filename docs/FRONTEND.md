@@ -59,6 +59,7 @@ Cada módulo deve ficar em `pages/`:
 - `EmployeesPage`
 - `PricesPage`
 - `PeriodsPage`
+- `ReportsPage` (prévia instantânea: KPIs + gráficos + tabelas financeiro/matriz)
 - `UsersPage`
 - `LoginPage`
 - `EmployeePortalPage`
@@ -99,6 +100,10 @@ Esses componentes devem ser reutilizados antes de criar variações novas.
 Componentes específicos da tela de lançamentos.
 
 Use essa pasta para regras visuais da grade, cards de funcionário, filtros e controles de quantidade.
+
+### `components/reports`
+
+Componentes da prévia da tela Relatórios: `ReportKpiCards`, `ReportCharts` (Recharts com cores via `var(--color-*)`, nunca hex fixo), `ReportFinancialTable`, `ReportDailyMatrixTable`.
 
 ### `components/employee-portal`
 

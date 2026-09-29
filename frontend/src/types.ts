@@ -69,6 +69,25 @@ export type EmployeeTotal = {
   quantity: number;
   amount: number;
   unitPrices: number[];
+  taken: number;
+  notTaken: number;
+  pending: number;
+};
+
+export type DailyMatrixCell = {
+  quantity: number;
+  confirmationStatus: "PENDING" | "PEGUEI" | "NAO_PEGUEI" | "NONE";
+};
+
+export type DailyMatrixDay = {
+  date: string;            // "YYYY-MM-DD"
+  dayOfWeek: number;       // 0=domingo, 6=sábado
+  weekdayLabel: string;    // "Seg", "Ter", "Sáb", "Dom"
+  isWeekend: boolean;
+  totalQuantity: number;   // faturável (PEGUEI)
+  totalRawQuantity: number;// soma bruta lançada
+  amount: number;          // R$ faturado no dia
+  entries: Record<string, DailyMatrixCell>; // employeeId -> { quantity, confirmationStatus }
 };
 
 export type DailyTotal = {
@@ -83,7 +102,13 @@ export type PeriodSummary = {
   totalAmount: number;
   employeeTotals: EmployeeTotal[];
   dailyTrend: DailyTotal[];
+  dailyMatrix: DailyMatrixDay[];
 };
+
+// Relatório por intervalo arbitrário: mesmo corpo do PeriodSummary; só o
+// objeto `period` é sintético (id "range"). Alias mantido para documentar
+// a intenção e permitir divergência futura sem quebrar consumidores.
+export type RangeSummary = PeriodSummary;
 
 export type DashboardSummary = {
   current: PeriodSummary;

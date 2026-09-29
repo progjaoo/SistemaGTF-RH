@@ -92,7 +92,9 @@ Regras:
 
 ## Relatórios (tela Relatórios — RH e gestora)
 
-- `GET /api/reports?start=YYYY-MM-DD&end=YYYY-MM-DD&format=json|xlsx|pdf` — soma por intervalo cruzando períodos, só `PEGUEI` é faturável; intervalo máximo 366 dias.
+- `GET /api/reports?start=YYYY-MM-DD&end=YYYY-MM-DD&format=json|xlsx|pdf|html` — soma por intervalo cruzando períodos, só `PEGUEI` é faturável; intervalo máximo 366 dias.
+- Payload JSON inclui `dailyMatrix[]` (`date`, `dayOfWeek`, `weekdayLabel`, `isWeekend`, `totalQuantity`, `totalRawQuantity`, `amount`, `entries[employeeId]`) e contagens `taken`/`notTaken`/`pending` por funcionário.
+- XLSX tem 3 abas: "Fechamento Folha" (fórmulas `SUM`, BRL), "Grade Diária" (matriz data × colaborador, fins de semana sombreados) e "Estatísticas".
 - Exportar planilha / gerar PDF / importar planilha moram na tela Relatórios (saíram do Lançamentos).
 
 Exemplo de erro para data futura:
