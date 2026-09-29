@@ -1,5 +1,5 @@
-// Vercel serverless: importa o backend COMPILADO (backend/dist) para que o
-// file-tracing inclua JS real — TS cru fora de api/ não é empacotado.
-import { app } from "../backend/dist/src/server.js";
+// Vercel serverless: importa o backend compilado COPIADO para ./_srv
+// (scripts/prepare-vercel-api.mjs) — o handler e o código ficam juntos.
+import { app } from "./_srv/src/server.js";
 
 export default app;

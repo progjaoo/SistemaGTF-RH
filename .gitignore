@@ -12,3 +12,4 @@ docs/
 backend/prisma/migrations/*/migration_lock.toml
 .neon
 .vercel/
+api/_srv/
