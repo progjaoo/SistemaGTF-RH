@@ -187,3 +187,28 @@ mealPricesRouter.post("/:id/close", requireRole(Role.RH, Role.ADMIN), asyncHandl
 
   res.json({ price: serializePrice(price) });
 }));
+
+// Exclusão cirúrgica: permitida apenas se a vigência NÃO cruzar período
+// fechado. Cruzando período fechado, a exclusão reescreveria relatório
+// congelado — bloqueia com 409 e orienta a encerrar + criar nova.
+mealPricesRouter.delete("/:id", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
+  const actor = (req as AuthenticatedRequest).user;
+  const existing = await prisma.mealPrice.findUnique({ where: { id: req.params.id } });
+  if (!existing) return res.status(404).json({ message: "Preço não encontrado." });
+
+  const frozen = await crossesClosedPeriod(existing.validFrom, existing.validTo);
+  if (frozen.length > 0) {
+    return res.status(409).json({
+      message: "Preço com histórico em período fechado não pode ser excluído. Encerre a vigência e crie uma nova.",
+      closedPeriods: frozen.map((period) => period.label)
+    });
+  }
+
+  await prisma.mealPrice.delete({ where: { id: existing.id } });
+
+  await prisma.auditLog.create({
+    data: { actorId: actor.id, entity: "MealPrice", entityId: existing.id, action: "DELETE_PRICE" }
+  });
+
+  res.json({ ok: true });
+}));

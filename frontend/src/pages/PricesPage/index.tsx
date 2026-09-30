@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
-import { Pencil, Plus, Square } from "lucide-react";
+import { Pencil, Plus, Square, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,7 @@ export default function PricesPage({
   const [scopeFilter, setScopeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [closing, setClosing] = useState<MealPrice | null>(null);
+  const [deleting, setDeleting] = useState<MealPrice | null>(null);
   const [endDate, setEndDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
@@ -118,6 +119,22 @@ export default function PricesPage({
     }
   }
 
+  async function confirmDelete() {
+    if (!deleting) return;
+    setBusy(true);
+    try {
+      await api.deleteMealPrice(token, deleting.id);
+      toast.success("Preço excluído.");
+      if (editing?.id === deleting.id) cancelEdit();
+      setDeleting(null);
+      await onReload();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <TwoColumn>
       <Panel>
@@ -163,7 +180,7 @@ export default function PricesPage({
         <PanelHeader>
           <div>
             <h2>Histórico de preços</h2>
-            <p>Preços alimentam relatórios fechados: não há excluir — encerre a vigência.</p>
+            <p>Preços alimentam relatórios: exclusão e alteração bloqueadas em período fechado — encerre a vigência e crie uma nova.</p>
           </div>
         </PanelHeader>
         <div className="mb-3 flex flex-wrap gap-2">
@@ -218,6 +235,10 @@ export default function PricesPage({
                         Encerrar
                       </Button>
                     )}
+                    <Button type="button" variant="outline" onClick={() => setDeleting(price)}>
+                      <Trash2 size={16} />
+                      Excluir
+                    </Button>
                   </InlineActions>
                 </td>
               </tr>
@@ -250,6 +271,26 @@ export default function PricesPage({
             </Button>
             <Button type="button" disabled={!endDate || busy} onClick={() => void confirmClose()}>
               Encerrar vigência
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleting !== null} onOpenChange={(open) => { if (!open) setDeleting(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir preço</DialogTitle>
+            <DialogDescription>
+              Excluir {deleting ? `${deleting.employee?.name ?? "Global"} · ${formatCurrency(deleting.value)}` : ""} definitivamente?
+              Lançamentos em período aberto serão recalculados. Se o preço tiver histórico em período fechado, a exclusão é bloqueada — encerre a vigência e crie uma nova.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleting(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" disabled={busy} onClick={() => void confirmDelete()}>
+              {busy ? "Excluindo..." : "Excluir preço"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -16,7 +16,10 @@ import type {
   User
 } from "./types";
 
-export const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3333/api";
+// Em produção (Vercel), frontend e API compartilham o mesmo domínio.
+// O fallback local continua apontando para o backend do Vite/Express.
+export const API_BASE = import.meta.env.VITE_API_URL
+  ?? (import.meta.env.PROD ? "/api" : "http://localhost:3333/api");
 
 export function getSocketConfig() {
   const url = new URL(API_BASE, window.location.origin);
@@ -95,6 +98,11 @@ export const api = {
     return request<{ price: MealPrice }>(`/meal-prices/${id}/close`, token, {
       method: "POST",
       body: JSON.stringify({ endDate })
+    });
+  },
+  deleteMealPrice(token: string, id: string) {
+    return request<{ ok: boolean }>(`/meal-prices/${id}`, token, {
+      method: "DELETE"
     });
   },
   periods(token: string) {

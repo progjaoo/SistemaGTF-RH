@@ -1,10 +1,22 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "npm install && npm --prefix backend install && npm --prefix frontend install",
-  "buildCommand": "npm --prefix backend exec -- prisma generate --schema=./backend/prisma/schema.prisma && npm run build --prefix backend && npm run build --prefix frontend && node scripts/prepare-vercel-api.mjs && mkdir -p prisma && cp backend/prisma/schema.prisma prisma/schema.prisma && npm --prefix backend exec -- prisma generate && rm -rf prisma",
+  "buildCommand": "node scripts/vercel-build.mjs",
   "outputDirectory": "frontend/dist",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api?path=:path*" },
+    { "source": "/colaborador/", "destination": "/index.html" },
+    { "source": "/colaborador/:path*", "destination": "/index.html" }
+  ],
   "functions": {
-    "api/index.ts": { "maxDuration": 30 }
+    "api/index.ts": {
+      "maxDuration": 30,
+      "includeFiles": "node_modules/pdfkit/**"
+    },
+    "api/[...all].ts": {
+      "maxDuration": 30,
+      "includeFiles": "node_modules/pdfkit/**"
+    }
   },
   "crons": [
     {

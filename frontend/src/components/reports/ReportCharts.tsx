@@ -28,6 +28,8 @@ const compactCurrency = (value: number) =>
     : `R$${value.toLocaleString("pt-BR")}`;
 
 // Tooltip escuro consistente com o padrão do DashboardView.
+// Texto sempre branco: o Tooltip padrão do recharts herdava cor preta
+// dentro do contentStyle escuro e ficava ilegível no hover.
 const tooltipStyle = { background: "#20262c", color: "#fff", border: "none", borderRadius: 8 };
 
 function EvolutionTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number | string }>; label?: string }) {
@@ -39,6 +41,37 @@ function EvolutionTooltip({ active, payload, label }: { active?: boolean; payloa
       <strong className="block">{label}</strong>
       <span className="block tabular-nums">{quantity} refeições</span>
       <span className="block tabular-nums">{formatCurrency(amount)} faturado</span>
+    </div>
+  );
+}
+
+function ConfirmationTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name?: string; value?: number | string; payload?: { name?: string } }> }) {
+  if (!active || !payload || payload.length === 0) return null;
+  const total = payload.reduce((acc, entry) => acc + Number(entry.value ?? 0), 0);
+  return (
+    <div style={{ ...tooltipStyle, color: "#fff" }} className="px-3 py-2 text-[0.82rem]">
+      {payload.map((entry, index) => {
+        const name = String(entry.name ?? entry.payload?.name ?? "Lançamentos");
+        const value = Number(entry.value ?? 0);
+        const percent = total > 0 ? ` · ${(value / total * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : "";
+        return (
+          <div key={`${name}-${index}`} className="flex items-center justify-between gap-3 tabular-nums">
+            <span>{name}</span>
+            <strong>{value.toLocaleString("pt-BR")}{percent}</strong>
+          </div>
+        );
+      })}
+      <div className="mt-1 opacity-80 tabular-nums">Total: {total.toLocaleString("pt-BR")} lançamentos</div>
+    </div>
+  );
+}
+
+function RankingTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value?: number | string }>; label?: string }) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div style={{ ...tooltipStyle, color: "#fff" }} className="px-3 py-2 text-[0.82rem]">
+      <strong className="block">{label}</strong>
+      <span className="block tabular-nums">{formatCurrency(Number(payload[0]?.value ?? 0))} a descontar</span>
     </div>
   );
 }
@@ -134,7 +167,7 @@ export default function ReportCharts({ summary }: { summary: PeriodSummary }) {
                     <Cell key={slice.name} fill={slice.fill} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [value, "Lançamentos"]} contentStyle={tooltipStyle} />
+                <Tooltip content={<ConfirmationTooltip />} />
               </PieChart>
             </ResponsiveContainer>
             <ul className="mt-2 grid gap-1 text-[0.85rem]" aria-label="Legenda de confirmações">
@@ -177,10 +210,7 @@ export default function ReportCharts({ summary }: { summary: PeriodSummary }) {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-line)" />
                 <XAxis type="number" tickFormatter={(value: number) => compactCurrency(Number(value))} tick={{ fontSize: 12 }} />
                 <YAxis type="category" dataKey="employeeName" width={128} tick={{ fontSize: 12 }} />
-                <Tooltip
-                  formatter={(value) => [formatCurrency(Number(value)), "A descontar"]}
-                  contentStyle={tooltipStyle}
-                />
+                <Tooltip content={<RankingTooltip />} />
                 <Bar dataKey="amount" name="A descontar" fill="var(--color-teal-deep)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
