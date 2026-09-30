@@ -13,6 +13,7 @@ import { portalLoginLimiter } from "../middleware/rate-limit.js";
 import { portalLimiter } from "../middleware/rate-limit.js";
 import { emitMealConfirmationUpdated } from "../realtime.js";
 import { formatDateKeyInSaoPaulo, isFutureDate } from "../services/date-rules.js";
+import { resolveMealPrice, roundCurrency } from "../services/calculations.js";
 
 export const employeePortalRouter = express.Router();
 
@@ -222,6 +223,82 @@ const pushSubscriptionSchema = z.object({
   endpoint: z.string().url(),
   keys: z.object({ p256dh: z.string().min(1), auth: z.string().min(1) })
 });
+
+// Resumo financeiro do colaborador: valor vigente por almoço, lançamentos
+// do mês e desconto previsto (só PEGUEI × preço da data — histórico
+// preservado). Mês sem período retorna 200 vazio para o portal orientar.
+employeePortalRouter.get("/:employeeId/resumo", authenticatePortal, asyncHandler(async (req, res) => {
+  const portalEmployee = (req as PortalRequest).portalEmployee;
+  if (portalEmployee.id !== req.params.employeeId) {
+    return res.status(403).json({ message: "Sessão de outro colaborador." });
+  }
+
+  const input = calendarSchema.parse(req.query);
+  const month = input.month ?? formatDateKeyInSaoPaulo().slice(0, 7);
+  const { startDate, endDate } = monthBounds(month);
+
+  const employee = await prisma.employee.findFirst({
+    where: { id: req.params.employeeId, status: EmployeeStatus.ACTIVE },
+    select: { id: true, name: true }
+  });
+  if (!employee) return res.status(404).json({ message: "Funcionário não encontrado." });
+
+  const [periods, prices, records] = await Promise.all([
+    prisma.billingPeriod.findMany({
+      where: { startDate: { lte: endDate }, endDate: { gte: startDate } },
+      orderBy: [{ status: "asc" }, { startDate: "asc" }]
+    }),
+    prisma.mealPrice.findMany(),
+    prisma.mealRecord.findMany({
+      where: {
+        employeeId: employee.id,
+        date: { gte: startDate, lte: endDate },
+        quantity: { gt: 0 }
+      },
+      orderBy: [{ date: "asc" }]
+    })
+  ]);
+
+  // OPEN primeiro (orderBy status asc: CLOSED < OPEN alfabeticamente? Não —
+  // "CLOSED" < "OPEN", então chega CLOSED antes; preferir OPEN aqui).
+  const period = periods.find((p) => p.status === BillingStatus.OPEN) ?? periods[0] ?? null;
+
+  const today = parseDate(formatDateKeyInSaoPaulo());
+  const current = resolveMealPrice(prices, employee.id, today);
+
+  const launches = records.map((record) => {
+    const price = resolveMealPrice(prices, employee.id, record.date);
+    const unitPrice = price ? Number(price.value) : 0;
+    const billable = record.confirmationStatus === "PEGUEI";
+    return {
+      date: formatDate(record.date),
+      quantity: record.quantity,
+      confirmationStatus: record.confirmationStatus,
+      unitPrice,
+      amount: roundCurrency(billable ? unitPrice * record.quantity : 0)
+    };
+  });
+
+  const totals = launches.reduce(
+    (acc, launch) => ({
+      taken: acc.taken + (launch.confirmationStatus === "PEGUEI" ? 1 : 0),
+      notTaken: acc.notTaken + (launch.confirmationStatus === "NAO_PEGUEI" ? 1 : 0),
+      pending: acc.pending + (launch.confirmationStatus === "PENDING" ? 1 : 0),
+      quantity: acc.quantity + (launch.confirmationStatus === "PEGUEI" ? launch.quantity : 0),
+      forecastAmount: roundCurrency(acc.forecastAmount + launch.amount)
+    }),
+    { taken: 0, notTaken: 0, pending: 0, quantity: 0, forecastAmount: 0 }
+  );
+
+  res.json({
+    employee,
+    month,
+    period: period ? { id: period.id, label: period.label, status: period.status } : null,
+    unitPrice: current ? Number(current.value) : 0,
+    launches,
+    totals
+  });
+}));
 
 employeePortalRouter.get("/:employeeId/push/vapid-key", authenticatePortal, asyncHandler(async (req, res) => {
   const portalEmployee = (req as PortalRequest).portalEmployee;
