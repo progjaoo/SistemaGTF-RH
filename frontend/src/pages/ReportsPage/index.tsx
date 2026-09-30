@@ -11,6 +11,7 @@ import ReportCharts from "../../components/reports/ReportCharts";
 import ReportFinancialTable from "../../components/reports/ReportFinancialTable";
 import ReportDailyMatrixTable from "../../components/reports/ReportDailyMatrixTable";
 import type { BillingPeriod, PeriodSummary } from "../../types";
+import type { Tab } from "../../navigation";
 
 type Mode = "period" | "range" | "import";
 type TableTab = "financial" | "matrix";
@@ -24,11 +25,13 @@ const MODES: Array<{ key: Mode; label: string }> = [
 export default function ReportsPage({
   token,
   periods,
-  onImported
+  onImported,
+  onNavigate
 }: {
   token: string;
   periods: BillingPeriod[];
   onImported: () => Promise<void>;
+  onNavigate?: (tab: Tab) => void;
 }) {
   const defaultPeriodId = useMemo(
     () => periods.find((period) => period.status === "OPEN")?.id ?? periods[0]?.id ?? "",
@@ -308,7 +311,7 @@ export default function ReportsPage({
             {!previewLoading && !previewError && (mode === "period" || rangeValid) && summary && (
               <div className="grid gap-[18px] max-[520px]:gap-3">
                 <ReportKpiCards summary={summary} />
-                <ReportCharts summary={summary} />
+                <ReportCharts summary={summary} onNavigate={onNavigate} />
                 <div
                   role="group"
                   aria-label="Visão da tabela"

@@ -14,7 +14,9 @@ import {
   YAxis
 } from "recharts";
 import { Panel, PanelHeader, EmptyState } from "../ui";
+import ActionGuide from "../ActionGuide";
 import type { PeriodSummary } from "../../types";
+import type { Tab } from "../../navigation";
 
 const formatCurrency = (value: number | null | undefined) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value ?? 0);
@@ -76,7 +78,7 @@ function RankingTooltip({ active, payload, label }: { active?: boolean; payload?
   );
 }
 
-export default function ReportCharts({ summary }: { summary: PeriodSummary }) {
+export default function ReportCharts({ summary, onNavigate }: { summary: PeriodSummary; onNavigate?: (tab: Tab) => void }) {
   const evolution = summary.dailyMatrix.map((day) => ({
     date: day.date,
     label: shortDate(day.date),
@@ -108,6 +110,15 @@ export default function ReportCharts({ summary }: { summary: PeriodSummary }) {
 
   return (
     <div className="grid grid-cols-1 gap-[18px] max-[520px]:gap-3 xl:grid-cols-5">
+      {!hasMovement && onNavigate && (
+        <div className="xl:col-span-5">
+          <ActionGuide
+            targetLabel="Lançamentos"
+            hint="Registre refeições no período para ver a evolução aqui."
+            onGo={() => onNavigate("records")}
+          />
+        </div>
+      )}
       <Panel className="min-w-0 xl:col-span-3">
         <PanelHeader>
           <div>

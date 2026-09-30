@@ -13,7 +13,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DataTable, Field, FormGrid, InlineActions, Panel, PanelHeader, TwoColumn } from "../../components/ui";
+import ActionGuide from "../../components/ActionGuide";
 import type { Employee, MealPrice } from "../../types";
+import type { Tab } from "../../navigation";
 import { fullDate } from "../../utils/date";
 import { formatCurrency } from "../../utils/format";
 
@@ -31,12 +33,14 @@ export default function PricesPage({
   token,
   prices,
   employees,
-  onReload
+  onReload,
+  onNavigate
 }: {
   token: string;
   prices: MealPrice[];
   employees: Employee[];
   onReload: () => Promise<void>;
+  onNavigate?: (tab: Tab) => void;
 }) {
   const [form, setForm] = useState<PriceForm>(EMPTY_FORM);
   const [editing, setEditing] = useState<MealPrice | null>(null);
@@ -129,7 +133,9 @@ export default function PricesPage({
       setDeleting(null);
       await onReload();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível excluir.");
+      const message = error instanceof Error ? error.message : "Não foi possível excluir.";
+      setFormError(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }
@@ -162,6 +168,13 @@ export default function PricesPage({
             </select>
           </Field>
           {formError && <p className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-[10px] text-[0.9rem] font-bold text-danger-ink">{formError}</p>}
+          {formError && onNavigate && (
+            <ActionGuide
+              targetLabel="Relatórios"
+              hint="O valor congelado segue valendo no fechado — aqui, encerre a vigência e crie uma nova."
+              onGo={() => onNavigate("reports")}
+            />
+          )}
           <InlineActions>
             <Button type="submit" disabled={busy}>
               <Plus size={17} />

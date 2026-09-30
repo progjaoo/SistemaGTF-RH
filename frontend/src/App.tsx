@@ -15,7 +15,8 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "./api";
 import { Eyebrow, Main, Sidebar, Toolbar, Topbar } from "./components/layout";
-import { Loading } from "./components/ui";
+import { Loading, Panel } from "./components/ui";
+import ActionGuide from "./components/ActionGuide";
 import { useSession } from "./hooks/useSession";
 import { useSidebarCollapsed } from "./hooks/useSidebarCollapsed";
 import type { NavigationTab, Tab } from "./navigation";
@@ -202,6 +203,7 @@ export default function App() {
             quantities={quantities}
             warnings={warnings}
             onChangeQuantity={(key, value) => setQuantities((current) => ({ ...current, [key]: value }))}
+            onNavigate={setActiveTab}
             onSave={async () => {
               const today = dateKeyInSaoPaulo();
               const dates = dateRange(selectedPeriod.startDate, selectedPeriod.endDate).filter((date) => date <= today);
@@ -226,6 +228,7 @@ export default function App() {
           <ReportsPage
             token={session.token}
             periods={periods}
+            onNavigate={setActiveTab}
             onImported={async () => {
               await refreshSelectedPeriod();
               toast.success("Planilha importada e lançamentos recarregados.");
@@ -257,6 +260,7 @@ export default function App() {
             token={session.token}
             prices={prices}
             employees={employees}
+            onNavigate={setActiveTab}
             onReload={async () => {
               await loadWorkspace(session);
             }}
@@ -282,10 +286,20 @@ export default function App() {
               toast.success("Período reaberto. Os lançamentos voltaram a ficar editáveis.");
             }}
             onExport={(period) => api.downloadReport(session.token, period)}
+            onNavigate={setActiveTab}
             onReload={async () => {
               await loadWorkspace(session);
             }}
           />
+        )}
+        {activeTab === "records" && !selectedPeriod && (
+          <Panel>
+            <ActionGuide
+              targetLabel="Períodos"
+              hint="Selecione ou crie um período para lançar refeições."
+              onGo={() => setActiveTab("periods")}
+            />
+          </Panel>
         )}
         {activeTab === "users" && canManage && (
           <UsersPage

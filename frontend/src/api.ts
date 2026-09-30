@@ -126,6 +126,11 @@ export const api = {
   reopenPeriod(token: string, id: string) {
     return request<{ period: BillingPeriod }>(`/billing-periods/${id}/reopen`, token, { method: "POST" });
   },
+  deletePeriod(token: string, id: string) {
+    return request<{ ok: boolean }>(`/billing-periods/${id}`, token, {
+      method: "DELETE"
+    });
+  },
   mealRecords(token: string, periodId: string) {
     return request<{ records: MealRecord[] }>(`/meal-records?periodId=${periodId}`, token);
   },

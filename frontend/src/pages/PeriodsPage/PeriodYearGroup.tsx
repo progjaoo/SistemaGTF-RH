@@ -6,9 +6,9 @@ import { formatCurrency } from "../../utils/format";
 import type { BillingPeriod } from "../../types";
 import PeriodRowActions from "./PeriodRowActions";
 
-export default function PeriodYearGroup({ year, periods, openCount, defaultOpen, onExport, onClose, onAskReopen }: {
+export default function PeriodYearGroup({ year, periods, openCount, defaultOpen, onExport, onClose, onAskReopen, onAskDelete }: {
   year: string; periods: BillingPeriod[]; openCount: number; defaultOpen: boolean;
-  onExport: (p: BillingPeriod) => void; onClose: (p: BillingPeriod) => void; onAskReopen: (p: BillingPeriod) => void;
+  onExport: (p: BillingPeriod) => void; onClose: (p: BillingPeriod) => void; onAskReopen: (p: BillingPeriod) => void; onAskDelete: (p: BillingPeriod) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   useEffect(() => { setOpen(defaultOpen); }, [defaultOpen]);
@@ -30,7 +30,7 @@ export default function PeriodYearGroup({ year, periods, openCount, defaultOpen,
                 <td><div className="font-medium">{p.label}</div><div className="text-xs text-muted">{p.startDate} → {p.endDate}</div></td>
                 <td><Badge variant={p.status === "OPEN" ? "warn" : "good"}>{p.status === "OPEN" ? "Aberto" : "Fechado"}</Badge></td>
                 <td style={{ textAlign: "right" }}>{formatCurrency(p.totalAmount)}</td>
-                <td><PeriodRowActions period={p} onExport={onExport} onClose={onClose} onAskReopen={onAskReopen} /></td>
+                <td><PeriodRowActions period={p} onExport={onExport} onClose={onClose} onAskReopen={onAskReopen} onAskDelete={onAskDelete} /></td>
               </tr>
             ))}
           </tbody>

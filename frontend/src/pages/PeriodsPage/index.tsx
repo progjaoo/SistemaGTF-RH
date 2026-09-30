@@ -11,8 +11,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EmptyState, Field, Panel, PanelHeader } from "../../components/ui";
+import ActionGuide from "../../components/ActionGuide";
 import { api } from "../../api";
 import type { BillingPeriod } from "../../types";
+import type { Tab } from "../../navigation";
 import { buildYearPreview } from "../../utils/periods";
 import { filterPeriods, getPeriodYears, groupPeriodsByYear } from "../../utils/periodFilters";
 import type { PeriodFilter } from "../../utils/periodFilters";
@@ -26,7 +28,8 @@ export default function PeriodsPage({
   onClose,
   onReopen,
   onExport,
-  onReload
+  onReload,
+  onNavigate
 }: {
   periods: BillingPeriod[];
   token: string;
@@ -35,12 +38,16 @@ export default function PeriodsPage({
   onReopen: (period: BillingPeriod) => Promise<void>;
   onExport: (period: BillingPeriod) => Promise<void>;
   onReload: () => Promise<void>;
+  onNavigate?: (tab: Tab) => void;
 }) {
   const [form, setForm] = useState({ label: "", startDate: "", endDate: "" });
   const [yearForm, setYearForm] = useState({ year: String(new Date().getFullYear() + 1), cutDay: "6", prefix: "" });
   const [yearBusy, setYearBusy] = useState(false);
   const [yearMessage, setYearMessage] = useState("");
   const [reopenTarget, setReopenTarget] = useState<BillingPeriod | null>(null);
+  const [deleting, setDeleting] = useState<BillingPeriod | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [filter, setFilter] = useState<PeriodFilter>({ year: "all", query: "", onlyOpen: false });
   const [newOpen, setNewOpen] = useState(false);
   const [yearOpen, setYearOpen] = useState(false);
@@ -88,6 +95,24 @@ export default function PeriodsPage({
     await onReopen(period);
   }
 
+  async function confirmDelete() {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    setDeleteError("");
+    try {
+      await api.deletePeriod(token, deleting.id);
+      toast.success("Período excluído.");
+      setDeleting(null);
+      await onReload();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Não foi possível excluir.";
+      setDeleteError(message);
+      toast.error(message);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   const years = useMemo(() => getPeriodYears(periods), [periods]);
   const filtered = useMemo(() => filterPeriods(periods, filter), [periods, filter]);
   const groups = useMemo(() => groupPeriodsByYear(filtered), [filtered]);
@@ -113,6 +138,13 @@ export default function PeriodsPage({
         </PanelHeader>
         <div className="grid gap-3">
           <PeriodFilterBar filter={filter} years={years} totalOpen={totalOpen} totalClosed={totalClosed} onChange={setFilter} />
+          {deleteError && onNavigate && (
+            <ActionGuide
+              targetLabel="Lançamentos"
+              hint="Apague ou mova os lançamentos do período antes de excluí-lo."
+              onGo={() => onNavigate("records")}
+            />
+          )}
           {groups.length === 0 ? (
             <EmptyState>Nenhum período encontrado para o filtro.</EmptyState>
           ) : (
@@ -127,6 +159,7 @@ export default function PeriodsPage({
                   onExport={onExport}
                   onClose={onClose}
                   onAskReopen={setReopenTarget}
+                  onAskDelete={setDeleting}
                 />
               ))}
             </div>
@@ -247,6 +280,25 @@ export default function PeriodsPage({
             </Button>
             <Button type="button" variant="danger" onClick={() => void confirmReopen()}>
               Reabrir período
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleting !== null} onOpenChange={(open) => { if (!open) setDeleting(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir período</DialogTitle>
+            <DialogDescription>
+              Excluir <strong>{deleting?.label}</strong> definitivamente? Só períodos abertos e sem lançamentos podem ser excluídos.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleting(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="danger" disabled={deleteBusy} onClick={() => void confirmDelete()}>
+              {deleteBusy ? "Excluindo..." : "Excluir período"}
             </Button>
           </DialogFooter>
         </DialogContent>

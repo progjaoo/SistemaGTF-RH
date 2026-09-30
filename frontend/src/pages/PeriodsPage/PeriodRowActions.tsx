@@ -1,13 +1,14 @@
-import { Download, Lock, Undo2 } from "lucide-react";
+import { Download, Lock, Trash2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InlineActions } from "../../components/ui";
 import type { BillingPeriod } from "../../types";
 
-export default function PeriodRowActions({ period, onExport, onClose, onAskReopen }: {
+export default function PeriodRowActions({ period, onExport, onClose, onAskReopen, onAskDelete }: {
   period: BillingPeriod;
   onExport: (p: BillingPeriod) => void;
   onClose: (p: BillingPeriod) => void;
   onAskReopen: (p: BillingPeriod) => void;
+  onAskDelete: (p: BillingPeriod) => void;
 }) {
   const closed = period.status === "CLOSED";
   return (
@@ -25,6 +26,9 @@ export default function PeriodRowActions({ period, onExport, onClose, onAskReope
           <Undo2 size={16} />
         </Button>
       )}
+      <Button type="button" variant="outline" size="icon" title="Excluir período" aria-label={`Excluir ${period.label}`} onClick={() => onAskDelete(period)}>
+        <Trash2 size={16} />
+      </Button>
     </InlineActions>
   );
 }

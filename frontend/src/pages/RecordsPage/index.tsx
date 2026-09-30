@@ -54,6 +54,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DataTable, EmptyState, Panel, PanelHeader } from "../../components/ui";
+import ActionGuide from "../../components/ActionGuide";
+import type { Tab } from "../../navigation";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useMealConfirmationRealtime } from "../../hooks/useMealConfirmationRealtime";
 import type { ApiWarning, BillingPeriod, Employee, MealConfirmationRealtimePayload, MealRecordConfirmation } from "../../types";
@@ -68,7 +70,8 @@ export default function RecordsPage({
   quantities,
   warnings,
   onChangeQuantity,
-  onSave
+  onSave,
+  onNavigate
 }: {
   token: string;
   employees: Employee[];
@@ -77,6 +80,7 @@ export default function RecordsPage({
   warnings: ApiWarning[];
   onChangeQuantity: (key: string, value: number) => void;
   onSave: () => Promise<void>;
+  onNavigate?: (tab: Tab) => void;
 }) {
   const [saving, setSaving] = useState(false);
   const [loadingConfirmations, setLoadingConfirmations] = useState(false);
@@ -284,6 +288,15 @@ export default function RecordsPage({
           {saving ? "Salvando..." : "Salvar"}
         </SaveButton>
       </RecordsHero>
+      {readOnly && onNavigate && (
+        <div className="mb-3">
+          <ActionGuide
+            targetLabel="Períodos"
+            hint="Reabra o período para voltar a editar os lançamentos."
+            onGo={() => onNavigate("periods")}
+          />
+        </div>
+      )}
 
       <DailyControls>
         <DateCard>
