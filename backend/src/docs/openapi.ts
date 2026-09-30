@@ -627,6 +627,24 @@ export const openApiDocument = {
         }
       }
     },
+    "/employee-portal/{employeeId}/resumo": {
+      get: {
+        tags: ["Employee Portal"],
+        summary: "Resumo financeiro do colaborador (Meu desconto)",
+        description: "Exige token do portal do próprio funcionário. Retorna valor vigente por almoço, lançamentos do mês e desconto previsto (só PEGUEI × preço da data). Mês sem período retorna 200 com period null.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "employeeId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          { name: "month", in: "query", required: false, schema: { type: "string", pattern: "^\\d{4}-\\d{2}$", example: "2026-07" } }
+        ],
+        responses: {
+          "200": { description: "Resumo financeiro do colaborador" },
+          "403": { description: "Sessão de outro colaborador" },
+          "404": { description: "Funcionário não encontrado" },
+          "422": { $ref: "#/components/responses/ValidationError" }
+        }
+      }
+    },
     "/employee-portal/{employeeId}/checkin": {
       post: {
         tags: ["Employee Portal"],
@@ -705,6 +723,19 @@ export const openApiDocument = {
         security: [{ bearerAuth: [] }],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         responses: { "200": { description: "Período reaberto" }, "409": { description: "Período já aberto" } }
+      },
+      delete: {
+        tags: ["Billing Periods"],
+        summary: "Exclui período aberto e sem lançamentos",
+        description: "RH/ADMIN. Período fechado ou com lançamentos/dias fechados retorna 409 com orientação — histórico preservado por desenho.",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          "200": { description: "Período excluído" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Período não encontrado" },
+          "409": { description: "Período fechado ou com lançamentos" }
+        }
       }
     },
     "/billing-periods/{id}/report": {

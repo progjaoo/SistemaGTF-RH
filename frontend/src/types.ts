@@ -159,6 +159,23 @@ export type MealRecordConfirmation = {
   confirmedAt: string | null;
 };
 
+export type EmployeePortalLaunch = {
+  date: string;
+  quantity: number;
+  confirmationStatus: ConfirmationStatus;
+  unitPrice: number;
+  amount: number;
+};
+
+export type EmployeePortalResumo = {
+  employee: Pick<Employee, "id" | "name">;
+  month: string;
+  period: Pick<BillingPeriod, "id" | "label" | "status"> | null;
+  unitPrice: number;
+  launches: EmployeePortalLaunch[];
+  totals: { taken: number; notTaken: number; pending: number; quantity: number; forecastAmount: number };
+};
+
 export type MealConfirmationRealtimePayload = {
   periodId: string;
   confirmation: MealRecordConfirmation;

@@ -4,9 +4,10 @@ import { api } from "../../api";
 import { BrandLogo } from "../../components/layout";
 import { AccessCodeStep } from "../../components/employee-portal/AccessCodeStep";
 import { EmployeeCalendar } from "../../components/employee-portal/EmployeeCalendar";
+import { EmployeeDiscountSummary } from "../../components/employee-portal/EmployeeDiscountSummary";
 import { NameSearch } from "../../components/employee-portal/NameSearch";
 import logoGtf from "../../images/logogtf.png";
-import type { ConfirmationStatus, EmployeePortalDay, EmployeePortalSearchResult } from "../../types";
+import type { ConfirmationStatus, EmployeePortalDay, EmployeePortalResumo, EmployeePortalSearchResult } from "../../types";
 import { monthKeyInSaoPaulo } from "../../utils/date";
 
 const TOKEN_KEY = "gtf-portal-token";
@@ -37,6 +38,9 @@ export default function EmployeePortalPage() {
   const [portalToken, setPortalToken] = useState(() => loadSession()?.token ?? "");
   const [month, setMonth] = useState(monthKeyInSaoPaulo);
   const [days, setDays] = useState<EmployeePortalDay[]>([]);
+  const [summary, setSummary] = useState<EmployeePortalResumo | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [summaryError, setSummaryError] = useState("");
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [loadingCode, setLoadingCode] = useState(false);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
@@ -71,6 +75,8 @@ export default function EmployeePortalPage() {
     setPortalToken("");
     setSelectedEmployee(null);
     setDays([]);
+    setSummary(null);
+    setSummaryError("");
   }
 
   async function search() {
@@ -133,6 +139,8 @@ export default function EmployeePortalPage() {
     let ignore = false;
     setLoadingCalendar(true);
     setCalendarError("");
+    setLoadingSummary(true);
+    setSummaryError("");
 
     api.employeePortalCalendar(selectedEmployee.id, month, portalToken)
       .then((response) => {
@@ -148,6 +156,22 @@ export default function EmployeePortalPage() {
       })
       .finally(() => {
         if (!ignore) setLoadingCalendar(false);
+      });
+
+    api.employeePortalSummary(selectedEmployee.id, month, portalToken)
+      .then((response) => {
+        if (!ignore) setSummary(response);
+      })
+      .catch((error) => {
+        if (ignore) return;
+        if (error instanceof Error && /expirada|autenticado|inválida/i.test(error.message)) {
+          handleExpiredSession();
+        } else {
+          setSummaryError(error instanceof Error ? error.message : "Não foi possível carregar o desconto.");
+        }
+      })
+      .finally(() => {
+        if (!ignore) setLoadingSummary(false);
       });
 
     return () => {
@@ -177,6 +201,12 @@ export default function EmployeePortalPage() {
           ? currentDays.map((day) => (day.id === response.record.id ? response.record : day))
           : [...currentDays, response.record].sort((a, b) => a.date.localeCompare(b.date))
       );
+      // O desconto previsto muda a cada marcação — recarrega o resumo do mês.
+      try {
+        setSummary(await api.employeePortalSummary(selectedEmployee.id, month, portalToken));
+      } catch {
+        /* o calendário já atualizou; o resumo tenta de novo na próxima troca de mês */
+      }
       if (status === "NAO_PEGUEI") toast.info("Registrado: você não pegou o almoço.");
     } catch (error) {
       if (error instanceof Error && /expirada|autenticado|inválida/i.test(error.message)) {
@@ -238,23 +268,26 @@ export default function EmployeePortalPage() {
       )}
 
       {step === "calendar" && selectedEmployee && (
-        <EmployeeCalendar
-          employee={selectedEmployee}
-          portalToken={portalToken}
-          month={month}
-          currentMonth={currentMonth}
-          days={days}
-          loading={loadingCalendar}
-          savingDate={savingDate}
-          error={calendarError}
-          onMonthChange={setMonth}
-          onCheckin={checkin}
-          onBack={() => {
-            clearSession();
-            setCalendarError("");
-            setStep("search");
-          }}
-        />
+        <>
+          <EmployeeCalendar
+            employee={selectedEmployee}
+            portalToken={portalToken}
+            month={month}
+            currentMonth={currentMonth}
+            days={days}
+            loading={loadingCalendar}
+            savingDate={savingDate}
+            error={calendarError}
+            onMonthChange={setMonth}
+            onCheckin={checkin}
+            onBack={() => {
+              clearSession();
+              setCalendarError("");
+              setStep("search");
+            }}
+          />
+          <EmployeeDiscountSummary summary={summary} loading={loadingSummary} error={summaryError} />
+        </>
       )}
     </main>
   );

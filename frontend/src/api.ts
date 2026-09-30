@@ -4,6 +4,7 @@ import type {
   DashboardSummary,
   Employee,
   EmployeePortalDay,
+  EmployeePortalResumo,
   EmployeePortalSearchResult,
   MealPrice,
   MealRecord,
@@ -198,6 +199,12 @@ export const api = {
   employeePortalCalendar(employeeId: string, month: string, portalToken: string) {
     return request<{ employee: EmployeePortalSearchResult; month: string; days: EmployeePortalDay[] }>(
       `/employee-portal/${employeeId}/calendar?month=${encodeURIComponent(month)}`,
+      portalToken
+    );
+  },
+  employeePortalSummary(employeeId: string, month: string, portalToken: string) {
+    return request<EmployeePortalResumo>(
+      `/employee-portal/${employeeId}/resumo?month=${encodeURIComponent(month)}`,
       portalToken
     );
   },
