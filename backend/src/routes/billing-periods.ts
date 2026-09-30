@@ -214,6 +214,42 @@ billingPeriodsRouter.post("/:id/reopen", requireRole(Role.RH, Role.ADMIN), async
   res.json({ period: serializePeriod(reopened) });
 }));
 
+// Exclusão cirúrgica: só período OPEN e sem nenhum lançamento/vínculo.
+// CLOSED ou com MealRecord/DayClose → 409 com orientação (espelho da
+// trava de preços em meal-prices.ts). Histórico preservado por desenho.
+billingPeriodsRouter.delete("/:id", requireRole(Role.RH, Role.ADMIN), asyncHandler(async (req, res) => {
+  const actor = (req as AuthenticatedRequest).user;
+  const period = await prisma.billingPeriod.findUnique({ where: { id: req.params.id } });
+
+  if (!period) {
+    return res.status(404).json({ message: "Período não encontrado." });
+  }
+
+  if (period.status === BillingStatus.CLOSED) {
+    return res.status(409).json({
+      message: "Período fechado não pode ser excluído. Para mexer nos lançamentos, reabra o período ou confira em Lançamentos."
+    });
+  }
+
+  const [recordCount, dayCloseCount] = await Promise.all([
+    prisma.mealRecord.count({ where: { periodId: period.id } }),
+    prisma.dayClose.count({ where: { periodId: period.id } })
+  ]);
+  if (recordCount > 0 || dayCloseCount > 0) {
+    return res.status(409).json({
+      message: "Período com lançamentos não pode ser excluído. Confira em Lançamentos."
+    });
+  }
+
+  await prisma.billingPeriod.delete({ where: { id: period.id } });
+
+  await prisma.auditLog.create({
+    data: { actorId: actor.id, entity: "BillingPeriod", entityId: period.id, action: "DELETE_PERIOD" }
+  });
+
+  res.json({ ok: true });
+}));
+
 billingPeriodsRouter.get("/:id/report", asyncHandler(async (req, res) => {
   const summary = await calculatePeriodSummary(req.params.id);
 
