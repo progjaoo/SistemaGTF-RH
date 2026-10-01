@@ -7,21 +7,34 @@ export function useMealConfirmationRealtime({
   token,
   periodId,
   enabled,
-  onConfirmation
+  onConfirmation,
+  onPoll
 }: {
   token: string;
   periodId: string;
   enabled: boolean;
   onConfirmation: (payload: MealConfirmationRealtimePayload) => void;
+  onPoll?: () => void;
 }) {
   const onConfirmationRef = useRef(onConfirmation);
+  const onPollRef = useRef(onPoll);
 
   useEffect(() => {
     onConfirmationRef.current = onConfirmation;
-  }, [onConfirmation]);
+    onPollRef.current = onPoll;
+  }, [onConfirmation, onPoll]);
 
   useEffect(() => {
     if (!enabled || !token || !periodId) return undefined;
+
+    let pollId: ReturnType<typeof setInterval> | null = null;
+    const startPolling = () => {
+      if (pollId !== null || !onPollRef.current) return;
+      // 8s, só com aba visível: na Vercel não há socket persistente.
+      pollId = setInterval(() => {
+        if (document.visibilityState === "visible") onPollRef.current?.();
+      }, 8000);
+    };
 
     const socketConfig = getSocketConfig();
     const socket = io(socketConfig.url, {
@@ -35,13 +48,14 @@ export function useMealConfirmationRealtime({
 
     socket.on("connect", () => {
       socket.emit("period:join", periodId);
+      if (pollId !== null) { clearInterval(pollId); pollId = null; }
     });
 
     // Sem Socket.IO no backend (ex.: serverless na Vercel), a conexão
-    // falha de cara — desconecta em vez de insistir nos 5 retries.
-    // A tela segue funcional via refetch manual/nas ações.
+    // falha de cara — cai para polling em vez de insistir nos retries.
     socket.on("connect_error", () => {
       socket.disconnect();
+      startPolling();
     });
 
     socket.on("meal-confirmation:updated", (payload: MealConfirmationRealtimePayload) => {
@@ -49,6 +63,7 @@ export function useMealConfirmationRealtime({
     });
 
     return () => {
+      if (pollId !== null) clearInterval(pollId);
       socket.emit("period:leave", periodId);
       socket.disconnect();
     };

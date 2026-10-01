@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CalendarCheck,
@@ -194,25 +194,27 @@ export default function RecordsPage({
       onChangeQuantity(`${employee.id}:${selectedDate}`, quantity);
     }
   };
-  const loadConfirmations = async (scope: "DAY" | "PERIOD") => {
-    setLoadingConfirmations(true);
+  const loadConfirmations = async (scope: "DAY" | "PERIOD", silent = false) => {
+    if (!silent) setLoadingConfirmations(true);
     setConfirmationScope(scope);
-    setConfirmationError("");
+    if (!silent) setConfirmationError("");
     try {
       const response = await api.mealRecordConfirmations(token, period.id, scope === "DAY" ? selectedDate : undefined);
       setConfirmations(response.confirmations);
     } catch (error) {
-      setConfirmationError(error instanceof Error ? error.message : "Não foi possível carregar confirmações.");
+      if (!silent) setConfirmationError(error instanceof Error ? error.message : "Não foi possível carregar confirmações.");
     } finally {
-      setLoadingConfirmations(false);
+      if (!silent) setLoadingConfirmations(false);
     }
   };
-  async function handleCloseDay() {
+  async function handleCloseDay(force = false) {
     setDayBusy(true);
     setCloseBlockers(null);
     try {
-      await api.closeDay(token, selectedDate);
-      toast.success(`Dia ${fullDate(selectedDate)} fechado.`);
+      const result = await api.closeDay(token, selectedDate, force);
+      toast.success(result.dayClose.forced
+        ? `Dia ${fullDate(selectedDate)} fechado com pendências.`
+        : `Dia ${fullDate(selectedDate)} fechado.`);
       setDayClosed(true);
       if (confirmationScope) await loadConfirmations(confirmationScope);
     } catch (error) {
@@ -264,11 +266,15 @@ export default function RecordsPage({
     });
   }, [confirmationScope, selectedDate]);
 
+  const confirmationScopeRef = useRef(confirmationScope);
+  confirmationScopeRef.current = confirmationScope;
+
   useMealConfirmationRealtime({
     token,
     periodId: period.id,
     enabled: Boolean(confirmationScope),
-    onConfirmation: applyRealtimeConfirmation
+    onConfirmation: applyRealtimeConfirmation,
+    onPoll: () => void loadConfirmations(confirmationScopeRef.current ?? "DAY", true)
   });
 
   return (
@@ -346,6 +352,10 @@ export default function RecordsPage({
               {closeBlockers.missing.length > 0 && (
                 <p>Sem marcação: {closeBlockers.missing.join(", ")}</p>
               )}
+              <p>Quem ficar pendente não entra no desconto. Dá para marcar pelo WhatsApp na conferência antes — ou fechar mesmo assim:</p>
+              <Button type="button" variant="danger" disabled={dayBusy} onClick={() => void handleCloseDay(true)}>
+                {dayBusy ? "Fechando..." : "Fechar mesmo assim"}
+              </Button>
             </EmptyState>
           </div>
         )}

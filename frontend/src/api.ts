@@ -181,8 +181,8 @@ export const api = {
   dayStatus(token: string, date: string) {
     return request<{ date: string; closed: boolean }>(`/meal-records/day-status?date=${date}`, token);
   },
-  closeDay(token: string, date: string) {
-    return request<{ dayClose: { date: string; closedAt: string } }>("/meal-records/day-close", token, { method: "POST", body: JSON.stringify({ date }) });
+  closeDay(token: string, date: string, force = false) {
+    return request<{ dayClose: { date: string; closedAt: string; forced: boolean } }>("/meal-records/day-close", token, { method: "POST", body: JSON.stringify({ date, force }) });
   },
   reopenDay(token: string, date: string) {
     return request<{ ok: boolean }>("/meal-records/day-reopen", token, { method: "POST", body: JSON.stringify({ date }) });
