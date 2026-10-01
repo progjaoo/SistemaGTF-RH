@@ -5,10 +5,11 @@ import { BrandLogo } from "../../components/layout";
 import { AccessCodeStep } from "../../components/employee-portal/AccessCodeStep";
 import { EmployeeCalendar } from "../../components/employee-portal/EmployeeCalendar";
 import { EmployeeDiscountSummary } from "../../components/employee-portal/EmployeeDiscountSummary";
+import { EmployeeMonthConference } from "../../components/employee-portal/EmployeeMonthConference";
 import { NameSearch } from "../../components/employee-portal/NameSearch";
 import logoGtf from "../../images/logogtf.png";
 import type { ConfirmationStatus, EmployeePortalDay, EmployeePortalResumo, EmployeePortalSearchResult } from "../../types";
-import { monthKeyInSaoPaulo } from "../../utils/date";
+import { dateKeyInSaoPaulo, monthKeyInSaoPaulo } from "../../utils/date";
 
 const TOKEN_KEY = "gtf-portal-token";
 const EMPLOYEE_KEY = "gtf-portal-employee";
@@ -287,6 +288,13 @@ export default function EmployeePortalPage() {
             }}
           />
           <EmployeeDiscountSummary summary={summary} loading={loadingSummary} error={summaryError} />
+          <EmployeeMonthConference
+            month={month}
+            days={days}
+            launches={summary?.launches ?? []}
+            loading={loadingCalendar || loadingSummary}
+            today={dateKeyInSaoPaulo()}
+          />
         </>
       )}
     </main>
