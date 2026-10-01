@@ -74,6 +74,21 @@ describe("day-close", () => {
     expect(res.body.pending).toContain(employeeName);
   });
 
+  it("force fecha dia com PENDING e audita nomes forçados", async () => {
+    const res = await request(app).post("/api/meal-records/day-close")
+      .set("Authorization", `Bearer ${rhToken}`)
+      .send({ date: "2021-07-07", force: true });
+    expect(res.status).toBe(201);
+    expect(res.body.dayClose.forced).toBe(true);
+    const audit = await prisma.auditLog.findFirst({
+      where: { entity: "DayClose", action: "DAY_CLOSE_FORCED" },
+      orderBy: { createdAt: "desc" }
+    });
+    expect(audit?.metadata).toMatchObject({ date: "2021-07-07" });
+    expect((audit?.metadata as { pending: string[] }).pending).toContain(employeeName);
+    await reopen("2021-07-07");
+  });
+
   it("faltante em jornada esperada bloqueia com 409 e lista missing", async () => {
     const res = await close("2021-07-06");
     expect(res.status).toBe(409);

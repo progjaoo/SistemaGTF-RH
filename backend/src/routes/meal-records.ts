@@ -236,6 +236,11 @@ mealRecordsRouter.post("/confirmations", asyncHandler(async (req, res) => {
 
 const daySchema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato YYYY-MM-DD.") });
 
+const dayCloseSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato YYYY-MM-DD."),
+  force: z.boolean().optional().default(false)
+});
+
 mealRecordsRouter.get("/day-status", asyncHandler(async (req, res) => {
   const input = daySchema.parse(req.query);
   const existing = await prisma.dayClose.findUnique({ where: { date: parseDate(input.date) } });
@@ -244,7 +249,7 @@ mealRecordsRouter.get("/day-status", asyncHandler(async (req, res) => {
 
 mealRecordsRouter.post("/day-close", asyncHandler(async (req, res) => {
   const actor = (req as AuthenticatedRequest).user;
-  const input = daySchema.parse(req.body);
+  const input = dayCloseSchema.parse(req.body);
   const date = parseDate(input.date);
   if (isFutureDate(date)) return res.status(422).json({ message: "Não é possível fechar data futura." });
   const period = await prisma.billingPeriod.findFirst({
@@ -257,18 +262,28 @@ mealRecordsRouter.post("/day-close", asyncHandler(async (req, res) => {
     where: { date }, include: { employee: { select: { id: true, name: true, status: true, scheduleType: true, workdays: true } } }
   });
   const pending = records.filter((r) => r.confirmationStatus === "PENDING").map((r) => r.employee.name);
-  if (pending.length) return res.status(409).json({ message: "Há confirmações pendentes.", pending });
   const withRecord = new Set(records.map((r) => r.employeeId));
   const employees = await prisma.employee.findMany({ where: { status: "ACTIVE" } });
   const missing = employees
     .filter((e) => !withRecord.has(e.id) && isExpectedWorkday(date, e.scheduleType, e.workdays ?? null))
     .map((e) => e.name);
-  if (missing.length) return res.status(409).json({ message: "Há colaboradores sem marcação.", missing });
+  // Sem force, pendências bloqueiam (409). Com force, a gestora assume e
+  // fecha mesmo assim — nomes vão para a auditoria DAY_CLOSE_FORCED.
+  if (pending.length && !input.force) return res.status(409).json({ message: "Há confirmações pendentes.", pending });
+  if (missing.length && !input.force) return res.status(409).json({ message: "Há colaboradores sem marcação.", missing });
   const dayClose = await prisma.dayClose.create({
     data: { date, periodId: period.id, closedById: actor.id }
   });
-  await prisma.auditLog.create({ data: { actorId: actor.id, entity: "DayClose", entityId: dayClose.id, action: "DAY_CLOSE", metadata: { date: input.date } } });
-  res.status(201).json({ dayClose: { date: input.date, closedAt: dayClose.closedAt } });
+  await prisma.auditLog.create({
+    data: {
+      actorId: actor.id,
+      entity: "DayClose",
+      entityId: dayClose.id,
+      action: input.force ? "DAY_CLOSE_FORCED" : "DAY_CLOSE",
+      metadata: { date: input.date, forced: input.force, pending, missing }
+    }
+  });
+  res.status(201).json({ dayClose: { date: input.date, closedAt: dayClose.closedAt, forced: input.force } });
 }));
 
 mealRecordsRouter.post("/day-reopen", asyncHandler(async (req, res) => {
