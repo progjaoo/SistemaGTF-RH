@@ -26,6 +26,11 @@ export function EmployeeDiscountSummary({ summary, loading, error }: {
           <span className="block text-[0.78rem] font-extrabold uppercase text-muted">Auditoria</span>
           <strong className="block text-[1.25rem]">Meu desconto</strong>
         </div>
+        {summary?.period && (
+          <span className={`ml-auto rounded-md border px-2 py-1 text-[0.78rem] font-extrabold uppercase ${summary.period.status === "CLOSED" ? "border-line bg-surface text-muted" : "border-teal bg-teal-bg text-teal-deep"}`}>
+            {summary.period.status === "CLOSED" ? "Fechado" : "Aberto"}
+          </span>
+        )}
       </div>
 
       {error && <div className="rounded-lg border border-danger/30 bg-danger/5 px-[10px] py-[10px] font-extrabold text-danger-ink">{error}</div>}
@@ -45,7 +50,9 @@ export function EmployeeDiscountSummary({ summary, loading, error }: {
               <span className="block text-[0.82rem] text-muted">vigente hoje</span>
             </div>
             <div className="rounded-lg border border-line p-4">
-              <span className="block text-[0.78rem] font-extrabold uppercase text-muted">Desconto previsto</span>
+              <span className="block text-[0.78rem] font-extrabold uppercase text-muted">
+                {summary.period.status === "CLOSED" ? "Descontado" : "Desconto previsto"}
+              </span>
               <strong className="block text-[1.6rem] tabular-nums">{formatCurrency(summary.totals.forecastAmount)}</strong>
               <span className="block text-[0.82rem] text-muted">
                 {summary.totals.taken} {summary.totals.taken === 1 ? "almoço (Pegou)" : "almoços (Pegou)"} · {summary.period.label}
@@ -70,7 +77,11 @@ export function EmployeeDiscountSummary({ summary, loading, error }: {
               ))}
             </ul>
           )}
-          <p className="text-[0.82rem] text-muted">Pendente ainda não conta no desconto — confirme no calendário.</p>
+          {summary.period.status === "OPEN" ? (
+            <p className="text-[0.82rem] text-muted">Pendente ainda não conta no desconto — confirme no calendário.</p>
+          ) : (
+            <p className="text-[0.82rem] text-muted">Valores finais do fechamento.</p>
+          )}
         </>
       )}
     </section>
