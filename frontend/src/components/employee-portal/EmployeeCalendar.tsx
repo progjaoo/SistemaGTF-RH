@@ -130,6 +130,17 @@ export function EmployeeCalendar({
         <div className="rounded-lg border border-dashed border-line bg-surface/70 p-7 text-muted">Carregando calendário...</div>
       ) : (
         <>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="portal-month" className="text-[0.82rem] font-extrabold text-muted">Mês</label>
+            <input
+              id="portal-month"
+              type="month"
+              value={month}
+              max={currentMonth}
+              onChange={(e) => { if (e.target.value) onMonthChange(e.target.value); }}
+              className="min-h-10 rounded-lg border border-line bg-surface px-[10px] text-ink"
+            />
+          </div>
           <div className="grid justify-items-center">
             <DayPicker
               mode="single"
